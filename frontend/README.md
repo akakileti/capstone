@@ -1,36 +1,30 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Frontend (React + TypeScript + Vite + Tailwind)
 
-## Getting Started
+Client-side projection tool that matches the onboarding checklist. Everything runs locally for now; later you can switch `src/lib/api.ts` to call the Flask backend.
 
-First, run the development server:
+## Available Scripts
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+npm run dev       # start Vite on http://localhost:5173
+npm run build     # type-check and build for production
+npm run preview   # preview the production build
+npm run lint      # run eslint
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Environment
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+`VITE_API_BASE_URL` overrides the default API URL. Create a `.env` file in this directory if you need to change it:
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Project layout
 
-## Learn More
+- `src/App.tsx` – page shell that wires the form and chart together.
+- `src/components/InputWizard.tsx` – multi-section Zod + react-hook-form experience with presets.
+- `src/components/DetailedPlanningPanel.tsx` – summaries plus entry points for the detailed planning modals.
+- `src/components/SavingsProgressionModal.tsx` / `RetirementSpendingModal.tsx` – configure multi-account contribution schedules and retirement drawdown plans.
+- `src/components/ChartPanel.tsx` – Recharts visualization with min/avg/max cases and nominal/real toggle.
+- `src/lib/schemas.ts` – shared Zod schema for plan inputs.
+- `src/lib/calc.ts` – local projection math and currency formatter.
+- `src/lib/api.ts` – single place to switch from local calc to the Flask API.
 
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+When you are ready to call Flask, update `runProjection` in `src/lib/api.ts` and swap the call site in `App.tsx` as described in the guide.
