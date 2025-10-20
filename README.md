@@ -1,4 +1,4 @@
-# Capstone Project
+# Capstone Project (generated summary for now)
 
 Semester project scaffold with a layered architecture:
 
