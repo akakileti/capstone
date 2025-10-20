@@ -19,7 +19,7 @@ npm run lint      # run eslint
 ## Project layout
 
 - `src/App.tsx` – page shell that wires the form and chart together.
-- `src/components/InputWizard.tsx` – multi-section Zod + react-hook-form experience with presets.
+- `src/components/InputWizard.tsx` – multi-section Zod + react-hook-form experience with presets; keeps high-level inputs in sync with the detailed planning schedules.
 - `src/components/DetailedPlanningPanel.tsx` – summaries plus entry points for the detailed planning modals.
 - `src/components/SavingsProgressionModal.tsx` / `RetirementSpendingModal.tsx` – configure multi-account contribution schedules and retirement drawdown plans.
 - `src/components/ChartPanel.tsx` – Recharts visualization with min/avg/max cases and nominal/real toggle.

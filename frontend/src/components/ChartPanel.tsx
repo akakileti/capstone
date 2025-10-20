@@ -47,7 +47,7 @@ export function ChartPanel({ cases, loading = false, error }: ChartPanelProps) {
   const hasData = chartData.length > 0;
 
   return (
-    <section className="relative flex min-h-[320px] max-h-[380px] flex-col rounded-3xl border border-slate-300 bg-white p-6 shadow-sm">
+    <section className="relative flex min-h-[480px] max-h-[560px] flex-col rounded-3xl border border-slate-300 bg-white p-6 shadow-sm">
       <header className="mb-4 flex flex-wrap items-center justify-between gap-4">
         <div>
           <h2 className="text-lg font-semibold text-slate-800">Your Savings Journey</h2>

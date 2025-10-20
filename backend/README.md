@@ -1,35 +1,20 @@
-# Backend (Flask)
+# Backend Overview
 
-Flask API configured with CORS, Pydantic validation, and a placeholder accumulation calculation.
+| File | Purpose |
+| --- | --- |
+| `app.py` | Flask entrypoint exposing `/api/calc/accumulation` and wiring CORS. |
+| `models.py` | Pydantic data contracts for plans, accounts, intervals, and scenarios. |
+| `domain/accumulation.py` | Pure projection engine, validation helpers, and response shaping. |
+| `tests/test_accumulation.py` | Pytest coverage for regression, overrides, spending, and validation. |
+| `sample_plan.json` | Example payload matching the frontend defaults. |
 
 ## Setup
 
-1. Create a virtual environment and activate it.
-2. Install dependencies:
-
-   ```bash
-   cd backend
-   pip install -r requirements-dev.txt
-   ```
-
-## Run the API
-
 ```bash
-flask --app backend.main:app --debug run
-# or python -m backend.main
+python -m venv .venv
+source .venv/bin/activate   # (Windows: .venv\Scripts\activate)
+pip install -U pip -r requirements.txt
+flask --app app run --port 5000 --debug
 ```
 
-The server listens on `http://localhost:5000` with routes under `/api`.
-
-## Tests
-
-```bash
-pytest
-```
-
-## Project layout
-
-- `app/` – Flask app factory, routes, and error handling.
-- `schemas/` – Pydantic models mirroring the frontend Zod schemas.
-- `core/` – Pure functions containing the calculation logic (no Flask imports).
-- `tests/` – Pytest suite for endpoints and future unit tests.
+Run tests with `pytest` from the `backend/` directory.
