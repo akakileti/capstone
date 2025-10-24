@@ -1,81 +1,72 @@
 from __future__ import annotations
 
-from typing import List, Optional
+from typing import List, Literal, Optional
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class ContributionRow(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, extra="forbid")
+    model_config = ConfigDict(extra="forbid")
 
-    from_age: int = Field(..., alias="fromAge", ge=10, le=110)
-    base: float = Field(..., ge=0)
-    growth_rate: float = Field(0, alias="growthRate", ge=-0.5, le=1)
-    years: Optional[int] = Field(None, ge=1, le=80)
+    fromAge: int = Field(ge=10, le=100)
+    base: float = Field(ge=0)
+    growthRate: float = Field(ge=-0.5, le=1)
+    years: Optional[int] = Field(default=None, ge=1, le=80)
 
 
 class GrowthOverrideRow(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, extra="forbid")
+    model_config = ConfigDict(extra="forbid")
 
-    from_age: int = Field(..., alias="fromAge", ge=10, le=110)
-    rate: float = Field(..., ge=-0.5, le=1)
-    years: Optional[int] = Field(None, ge=1, le=80)
+    fromAge: int = Field(ge=10, le=100)
+    rate: float = Field(ge=-0.5, le=1)
+    years: Optional[int] = Field(default=None, ge=1, le=80)
 
 
 class Account(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, extra="forbid")
+    model_config = ConfigDict(extra="forbid")
 
     label: str
-    note: Optional[str] = ""
-    initial_balance: float = Field(0, alias="initialBalance")
+    initialBalance: float = Field(ge=0)
     contributions: List[ContributionRow] = Field(default_factory=list)
-    growth_overrides: List[GrowthOverrideRow] = Field(default_factory=list, alias="growthOverrides")
+    growthOverrides: List[GrowthOverrideRow] = Field(default_factory=list)
 
 
 class SpendingRow(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, extra="forbid")
+    model_config = ConfigDict(extra="forbid")
 
-    from_age: int = Field(..., alias="fromAge", ge=10, le=120)
-    annual_spending: float = Field(..., alias="annualSpending", ge=0)
-    years: Optional[int] = Field(None, ge=1, le=80)
+    fromAge: int = Field(ge=10, le=110)
+    annualSpending: float = Field(ge=0)
+    years: Optional[int] = Field(default=None, ge=1, le=80)
 
 
-class Scenario(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, extra="forbid")
+class GrowthScenario(BaseModel):
+    model_config = ConfigDict(extra="forbid")
 
-    kind: str
-    nominal_rate: float = Field(..., alias="nominalRate", ge=-0.5, le=1)
+    kind: Literal["min", "avg", "max"]
+    nominalRate: float
 
 
 class Plan(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, extra="forbid")
+    model_config = ConfigDict(extra="forbid")
 
-    start_age: int = Field(..., alias="startAge", ge=10, le=90)
-    retire_age: int = Field(..., alias="retireAge", ge=20, le=110)
-    inflation_rate: float = Field(..., alias="inflationRate", ge=0, le=0.3)
+    startAge: int = Field(ge=10, le=100)
+    retireAge: int = Field(ge=20, le=110)
+    inflationRate: float = Field(ge=0, le=0.3)
 
-    initial_balance: float = Field(0, alias="initialBalance", ge=0)
-    annual_contribution: float = Field(0, alias="annualContribution", ge=0)
-    nominal_growth_rate: float = Field(0.06, alias="nominalGrowthRate", ge=-0.5, le=1)
+    initialBalance: float = 0.0
+    annualContribution: float = 0.0
+    nominalGrowthRate: float = 0.06
 
     accounts: List[Account] = Field(default_factory=list)
-    spending_schedule: List[SpendingRow] = Field(default_factory=list, alias="spendingSchedule")
-    scenarios: List[Scenario] = Field(default_factory=list)
-
-    starting_retirement_spending: float = Field(0, alias="startingRetirementSpending", ge=0)
-
-    @field_validator("retire_age")
-    @classmethod
-    def check_retire_after_start(cls, value: int, info):
-        start_age = info.data.get("start_age")
-        if start_age is not None and value <= start_age:
-            raise ValueError("retireAge must be greater than startAge")
-        return value
+    spendingSchedule: List[SpendingRow] = Field(default_factory=list)
+    scenarios: List[GrowthScenario] = Field(default_factory=list)
 
     @model_validator(mode="after")
-    def ensure_scenarios(self) -> "Plan":
+    def ensure_validity(self) -> "Plan":
+        if self.retireAge <= self.startAge:
+            raise ValueError("retireAge must be greater than startAge")
         if not self.scenarios:
             self.scenarios = [
-                Scenario(kind="avg", nominal_rate=self.nominal_growth_rate),
+                GrowthScenario(kind="avg", nominalRate=self.nominalGrowthRate),
             ]
         return self

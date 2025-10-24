@@ -1,24 +1,25 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Dict, Iterable, List, Tuple
+from datetime import datetime
+from typing import Iterable, List, Optional, Sequence
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict
 
 from models import (
     Account,
     ContributionRow,
     GrowthOverrideRow,
+    GrowthScenario,
     Plan,
-    Scenario,
     SpendingRow,
 )
 
 
-@dataclass
-class PlanValidation:
-    errors: List[str]
-    warnings: List[str]
+class PlanValidationError(ValueError):
+    def __init__(self, errors: List[str]):
+        super().__init__("; ".join(errors))
+        self.errors = errors
 
 
 @dataclass
@@ -32,8 +33,8 @@ class Interval:
 class PreparedAccount:
     label: str
     initial_balance: float
-    contributions: List[ContributionRow]
-    growth_overrides: List[GrowthOverrideRow]
+    contributions: List[Interval]
+    overrides: List[Interval]
 
 
 @dataclass
@@ -42,12 +43,19 @@ class PreparedPlan:
     retire_age: int
     inflation_rate: float
     accounts: List[PreparedAccount]
-    spending_schedule: List[SpendingRow]
-    scenarios: List[Scenario]
+    spending: List[Interval]
+    scenarios: List[GrowthScenario]
+
+
+@dataclass
+class PreparationResult:
+    plan: Optional[PreparedPlan]
+    errors: List[str]
+    warnings: List[str]
 
 
 class AccountSnapshot(BaseModel):
-    model_config = ConfigDict(populate_by_name=True)
+    model_config = ConfigDict(extra="forbid")
 
     label: str
     nominal: float
@@ -55,12 +63,14 @@ class AccountSnapshot(BaseModel):
 
 
 class TotalSnapshot(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     nominal: float
     real: float
 
 
 class YearEntry(BaseModel):
-    model_config = ConfigDict(populate_by_name=True)
+    model_config = ConfigDict(extra="forbid")
 
     scenario: str
     age: int
@@ -69,264 +79,201 @@ class YearEntry(BaseModel):
     total: TotalSnapshot
 
 
-class AccumulationResult(BaseModel):
+class AccumulationPayload(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     entries: List[YearEntry]
+    warnings: List[str] = []
 
 
-def prepare_plan(plan: Plan) -> tuple[PreparedPlan, PlanValidation]:
-    accounts = _build_accounts(plan)
-    spending = _build_spending(plan)
+def make_intervals(
+    rows: Iterable[object],
+    stop_age: int,
+    label: str,
+) -> tuple[List[Interval], List[str], List[str]]:
+    sorted_rows = sorted(rows, key=lambda row: getattr(row, "fromAge"))
+    intervals: List[Interval] = []
+    errors: List[str] = []
+    warnings: List[str] = []
 
+    previous_end: Optional[int] = None
+
+    for index, row in enumerate(sorted_rows):
+        start = getattr(row, "fromAge")
+        next_start = getattr(sorted_rows[index + 1], "fromAge") if index + 1 < len(sorted_rows) else stop_age
+        if getattr(row, "years") is not None:
+            end = min(start + getattr(row, "years"), stop_age)
+        else:
+            end = min(next_start, stop_age)
+
+        if end <= start:
+            errors.append(f"{label} invalid interval at age {start}")
+
+        if previous_end is not None:
+            if start < previous_end:
+                errors.append(f"{label} overlap ages {start}-{previous_end}")
+            elif start > previous_end:
+                warnings.append(f"{label} gap ages {previous_end}-{start}")
+
+        intervals.append(Interval(start=start, end=end, row=row))
+        previous_end = end
+
+    return intervals, errors, warnings
+
+
+def active_row(intervals: Sequence[Interval], age: int) -> Optional[object]:
+    for interval in intervals:
+        if interval.start <= age < interval.end:
+            return interval.row
+    return None
+
+
+def fisher_rate(nominal_rate: float, inflation_rate: float) -> float:
+    return (1 + nominal_rate) / (1 + inflation_rate) - 1
+
+
+def prepare_plan(plan: Plan) -> PreparationResult:
+    accounts = list(plan.accounts)
+    if not accounts and (plan.initialBalance or plan.annualContribution):
+        derived_years = max(plan.retireAge - plan.startAge, 1)
+        accounts = [
+            Account(
+                label="Main",
+                initialBalance=plan.initialBalance,
+                contributions=[
+                    ContributionRow(
+                        fromAge=plan.startAge,
+                        base=plan.annualContribution,
+                        growthRate=0.0,
+                        years=derived_years,
+                    )
+                ],
+                growthOverrides=[],
+            )
+        ]
+
+    prepared_accounts: List[PreparedAccount] = []
     errors: List[str] = []
     warnings: List[str] = []
 
     for account in accounts:
-        account_errors, account_warnings = _validate_rows(
-            rows=account.contributions,
-            fallback_end=plan.retire_age,
-            label=f"{account.label} contributions",
+        contributions, contrib_errors, contrib_warnings = make_intervals(
+            account.contributions,
+            plan.retireAge,
+            f"{account.label} contributions",
         )
-        errors.extend(account_errors)
-        warnings.extend(account_warnings)
+        overrides, override_errors, override_warnings = make_intervals(
+            account.growthOverrides,
+            plan.retireAge + 1,
+            f"{account.label} overrides",
+        )
 
-        override_errors, override_warnings = _validate_rows(
-            rows=account.growth_overrides,
-            fallback_end=plan.retire_age + 1,
-            label=f"{account.label} growth overrides",
-        )
+        errors.extend(contrib_errors)
         errors.extend(override_errors)
+        warnings.extend(contrib_warnings)
         warnings.extend(override_warnings)
 
-    spending_errors, spending_warnings = _validate_rows(
-        rows=spending,
-        fallback_end=plan.retire_age + 60,
-        label="spending schedule",
+        prepared_accounts.append(
+            PreparedAccount(
+                label=account.label,
+                initial_balance=account.initialBalance,
+                contributions=contributions,
+                overrides=overrides,
+            )
+        )
+
+    if not prepared_accounts:
+        errors.append("plan requires at least one account or initial balance/contribution")
+        return PreparationResult(plan=None, errors=errors, warnings=warnings)
+
+    spending_intervals, spending_errors, spending_warnings = make_intervals(
+        plan.spendingSchedule,
+        plan.retireAge + 60,
+        "spending",
     )
     errors.extend(spending_errors)
     warnings.extend(spending_warnings)
 
     prepared = PreparedPlan(
-        start_age=plan.start_age,
-        retire_age=plan.retire_age,
-        inflation_rate=plan.inflation_rate,
-        accounts=accounts,
-        spending_schedule=spending,
+        start_age=plan.startAge,
+        retire_age=plan.retireAge,
+        inflation_rate=plan.inflationRate,
+        accounts=prepared_accounts,
+        spending=spending_intervals,
         scenarios=plan.scenarios,
     )
-    return prepared, PlanValidation(errors=errors, warnings=warnings)
+    return PreparationResult(plan=prepared, errors=errors, warnings=warnings)
 
 
-def accumulate_plan(plan: PreparedPlan, base_year: int) -> AccumulationResult:
+def accumulations(plan: Plan, base_year: Optional[int] = None) -> AccumulationPayload:
+    base_year = base_year or datetime.utcnow().year
+    preparation = prepare_plan(plan)
+    if preparation.errors or not preparation.plan:
+        raise PlanValidationError(preparation.errors)
+
     entries: List[YearEntry] = []
+    prepared = preparation.plan
 
-    contribution_schedules = [
-        _expand_contributions(account.contributions, plan.start_age, plan.retire_age)
-        for account in plan.accounts
-    ]
-    override_schedules = [
-        _expand_overrides(account.growth_overrides, plan.start_age, plan.retire_age)
-        for account in plan.accounts
-    ]
-    spending_schedule = _expand_spending(
-        plan.spending_schedule, plan.start_age, plan.retire_age + 60
-    )
+    for scenario in prepared.scenarios:
+        nominal_balances = [account.initial_balance for account in prepared.accounts]
+        real_balances = [account.initial_balance for account in prepared.accounts]
 
-    for scenario in plan.scenarios:
-        balances = [account.initial_balance for account in plan.accounts]
-        inflation_factor = 1.0
+        for offset, age in enumerate(range(prepared.start_age, prepared.retire_age + 1)):
+            price_level = (1 + prepared.inflation_rate) ** (age - prepared.start_age)
 
-        for offset, age in enumerate(range(plan.start_age, plan.retire_age + 1)):
-            #contributions at start of working year
-            if age < plan.retire_age:
-                for idx, schedule in enumerate(contribution_schedules):
-                    contribution = schedule.get(age, 0.0)
-                    balances[idx] += contribution
+            if age < prepared.retire_age:
+                for index, account in enumerate(prepared.accounts):
+                    contribution_row = active_row(account.contributions, age)
+                    if contribution_row is None:
+                        continue
+                    exponent = age - contribution_row.fromAge
+                    amount_nominal = contribution_row.base * (1 + contribution_row.growthRate) ** exponent
+                    nominal_balances[index] += amount_nominal
+                    real_balances[index] += amount_nominal / price_level
 
-            #spending deducted at retirement and beyond
-            if age >= plan.retire_age:
-                spending_amount = spending_schedule.get(age, 0.0)
-                if spending_amount:
-                    _apply_spending(balances, spending_amount)
+            if age >= prepared.retire_age:
+                spending_row = active_row(prepared.spending, age)
+                if spending_row and spending_row.annualSpending:
+                    amount_nominal = spending_row.annualSpending
+                    amount_real = amount_nominal / price_level
+                    _apply_spending_balances(nominal_balances, amount_nominal)
+                    _apply_spending_balances(real_balances, amount_real)
 
-            #growth per account
-            for idx, balance in enumerate(balances):
-                override = override_schedules[idx].get(age)
-                nominal_rate = override if override is not None else scenario.nominal_rate
-                balances[idx] = balance * (1 + nominal_rate)
+            for index, account in enumerate(prepared.accounts):
+                override_row = active_row(account.overrides, age)
+                nominal_rate = override_row.rate if override_row else scenario.nominalRate
+                real_rate = fisher_rate(nominal_rate, prepared.inflation_rate)
+                nominal_balances[index] *= 1 + nominal_rate
+                real_balances[index] *= 1 + real_rate
 
-            total_nominal = sum(balances)
-            real_accounts = [balance / inflation_factor for balance in balances]
-            total_real = total_nominal / inflation_factor
-
-            account_snapshots = [
-                AccountSnapshot(
-                    label=plan.accounts[idx].label,
-                    nominal=balances[idx],
-                    real=real_accounts[idx],
-                )
-                for idx in range(len(balances))
-            ]
+            total_nominal = sum(nominal_balances)
+            total_real = sum(real_balances)
 
             entries.append(
                 YearEntry(
                     scenario=scenario.kind,
                     age=age,
                     year=base_year + offset,
-                    accounts=account_snapshots,
+                    accounts=[
+                        AccountSnapshot(
+                            label=prepared.accounts[index].label,
+                            nominal=nominal_balances[index],
+                            real=real_balances[index],
+                        )
+                        for index in range(len(prepared.accounts))
+                    ],
                     total=TotalSnapshot(nominal=total_nominal, real=total_real),
                 )
             )
 
-            inflation_factor *= 1 + plan.inflation_rate
-
-    return AccumulationResult(entries=entries)
+    return AccumulationPayload(entries=entries, warnings=preparation.warnings)
 
 
-def _build_accounts(plan: Plan) -> List[PreparedAccount]:
-    accounts: List[PreparedAccount] = [
-        PreparedAccount(
-            label=account.label,
-            initial_balance=account.initial_balance,
-            contributions=list(account.contributions),
-            growth_overrides=list(account.growth_overrides),
-        )
-        for account in plan.accounts
-    ]
-
-    if not accounts:
-        contributions = []
-        if plan.annual_contribution:
-            contributions.append(
-                ContributionRow(
-                    fromAge=plan.start_age,
-                    base=plan.annual_contribution,
-                    growthRate=0,
-                    years=max(plan.retire_age - plan.start_age, 1),
-                )
-            )
-        accounts.append(
-            PreparedAccount(
-                label="Main",
-                initial_balance=plan.initial_balance,
-                contributions=contributions,
-                growth_overrides=[],
-            )
-        )
-    else:
-        other_total = sum(acc.initial_balance for acc in accounts[1:])
-        first_balance = max(plan.initial_balance - other_total, 0)
-        accounts[0].initial_balance = first_balance
-
-    return accounts
-
-
-def _build_spending(plan: Plan) -> List[SpendingRow]:
-    schedule = list(plan.spending_schedule)
-    if schedule:
-        for idx, row in enumerate(schedule):
-            if row.from_age == plan.retire_age:
-                schedule[idx] = row.model_copy(update={"annualSpending": plan.starting_retirement_spending})
-                break
-        else:
-            if plan.starting_retirement_spending:
-                schedule.append(
-                    SpendingRow(
-                        fromAge=plan.retire_age,
-                        annualSpending=plan.starting_retirement_spending,
-                        years=25,
-                    )
-                )
-    elif plan.starting_retirement_spending:
-        schedule.append(
-            SpendingRow(
-                fromAge=plan.retire_age,
-                annualSpending=plan.starting_retirement_spending,
-                years=25,
-            )
-        )
-    return schedule
-
-
-def _validate_rows(rows: Iterable[object], fallback_end: int, label: str) -> tuple[List[str], List[str]]:
-    entries = list(rows)
-    if not entries:
-        return [], []
-
-    sorted_rows = sorted(entries, key=lambda row: row.from_age)
-    errors: List[str] = []
-    warnings: List[str] = []
-    previous_end = None
-
-    for idx, row in enumerate(sorted_rows):
-        next_start = sorted_rows[idx + 1].from_age if idx + 1 < len(sorted_rows) else fallback_end
-        if row.years:
-            end = row.from_age + row.years
-        else:
-            end = next_start
-        end = min(end, fallback_end)
-
-        if end <= row.from_age:
-            errors.append(f"{label} invalid window at age {row.from_age}")
-        if previous_end is not None:
-            if row.from_age < previous_end:
-                errors.append(f"{label} overlap ages {row.from_age}-{previous_end}")
-            elif row.from_age > previous_end:
-                warnings.append(f"{label} gap ages {previous_end}-{row.from_age}")
-        previous_end = end
-
-    return errors, warnings
-
-
-def _expand_contributions(rows: List[ContributionRow], start_age: int, retire_age: int) -> Dict[int, float]:
-    schedule: Dict[int, float] = {}
-    if not rows:
-        return schedule
-    sorted_rows = sorted(rows, key=lambda row: row.from_age)
-    for idx, row in enumerate(sorted_rows):
-        next_start = sorted_rows[idx + 1].from_age if idx + 1 < len(sorted_rows) else retire_age
-        end = row.from_age + row.years if row.years else next_start
-        end = min(end, retire_age)
-        for offset, age in enumerate(range(row.from_age, end)):
-            if age >= retire_age:
-                break
-            amount = row.base * (1 + row.growth_rate) ** offset
-            schedule[age] = amount
-    return schedule
-
-
-def _expand_overrides(rows: List[GrowthOverrideRow], start_age: int, retire_age: int) -> Dict[int, float]:
-    schedule: Dict[int, float] = {}
-    if not rows:
-        return schedule
-    sorted_rows = sorted(rows, key=lambda row: row.from_age)
-    for idx, row in enumerate(sorted_rows):
-        next_start = sorted_rows[idx + 1].from_age if idx + 1 < len(sorted_rows) else retire_age + 1
-        end = row.from_age + row.years if row.years else next_start
-        end = min(end, retire_age + 1)
-        for age in range(row.from_age, end):
-            schedule[age] = row.rate
-    return schedule
-
-
-def _expand_spending(rows: List[SpendingRow], start_age: int, fallback_end: int) -> Dict[int, float]:
-    schedule: Dict[int, float] = {}
-    if not rows:
-        return schedule
-    sorted_rows = sorted(rows, key=lambda row: row.from_age)
-    for idx, row in enumerate(sorted_rows):
-        next_start = sorted_rows[idx + 1].from_age if idx + 1 < len(sorted_rows) else fallback_end
-        end = row.from_age + row.years if row.years else next_start
-        end = min(end, fallback_end)
-        for age in range(row.from_age, end):
-            schedule[age] = row.annual_spending
-    return schedule
-
-
-def _apply_spending(balances: List[float], spending_amount: float) -> None:
+def _apply_spending_balances(balances: List[float], amount: float) -> None:
     total_before = sum(balances)
     if total_before <= 0:
-        balances[0] -= spending_amount
+        balances[0] -= amount
         return
-    for idx, balance in enumerate(balances):
-        share = (balance / total_before) * spending_amount
-        balances[idx] -= share
+    for index, balance in enumerate(balances):
+        share = (balance / total_before) * amount
+        balances[index] -= share

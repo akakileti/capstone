@@ -12,9 +12,17 @@
 
 ```bash
 python -m venv .venv
-source .venv/bin/activate   # (Windows: .venv\Scripts\activate)
+source .venv/bin/activate   #windows:.venv\Scripts\activate
 pip install -U pip -r requirements.txt
 flask --app app run --port 5000 --debug
 ```
 
 Run tests with `pytest` from the `backend/` directory.
+
+## Curl demo
+
+```bash
+#curl: curl -s -X POST http://localhost:5000/api/calc/accumulation \
+#curl:   -H 'Content-Type: application/json' \
+#curl:   -d @sample_plan.json | jq .
+```

@@ -9,7 +9,7 @@ import { SavingsProgressionModal } from "./SavingsProgressionModal";
 
 interface DetailedPlanningPanelProps {
   plan: Plan;
-  onPlanChange: (updater: (plan: Plan) => Plan) => void | Promise<void>;
+  onPlanChange: (updater: (plan: Plan) => Plan) => void;
   disabled?: boolean;
 }
 
@@ -63,12 +63,12 @@ export function DetailedPlanningPanel({ plan, onPlanChange, disabled = false }: 
           plan={plan}
           onClose={() => setShowSavingsModal(false)}
           onSave={(accounts) => {
-            Promise.resolve(
-              onPlanChange((current) => ({
-                ...current,
-                accounts,
-              })),
-            ).finally(() => setShowSavingsModal(false));
+            onPlanChange((current) => ({
+              ...current,
+              initialBalance: accounts[0]?.initialBalance ?? current.initialBalance,
+              accounts,
+            }));
+            setShowSavingsModal(false);
           }}
         />
       ) : null}
@@ -78,12 +78,11 @@ export function DetailedPlanningPanel({ plan, onPlanChange, disabled = false }: 
           plan={plan}
           onClose={() => setShowSpendingModal(false)}
           onSave={(schedule) => {
-            Promise.resolve(
-              onPlanChange((current) => ({
-                ...current,
-                spendingSchedule: schedule,
-              })),
-            ).finally(() => setShowSpendingModal(false));
+            onPlanChange((current) => ({
+              ...current,
+              spendingSchedule: schedule,
+            }));
+            setShowSpendingModal(false);
           }}
         />
       ) : null}

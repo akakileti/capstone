@@ -15,13 +15,14 @@ import { formatCurrency, type ProjectionCase } from "../lib/calc";
 
 interface ChartPanelProps {
   cases: ProjectionCase[];
+  warnings?: string[];
   loading?: boolean;
   error?: string | null;
 }
 
 type DisplayMode = "nominal" | "real";
 
-export function ChartPanel({ cases, loading = false, error }: ChartPanelProps) {
+export function ChartPanel({ cases, warnings = [], loading = false, error }: ChartPanelProps) {
   const [mode, setMode] = useState<DisplayMode>("nominal");
 
   const chartData = useMemo(() => {
@@ -99,10 +100,16 @@ export function ChartPanel({ cases, loading = false, error }: ChartPanelProps) {
         )}
       </div>
 
-      {error ? (
-        <p className="mt-4 text-sm text-red-600">
-          {error}
-        </p>
+      {error ? <p className="mt-4 text-sm text-red-600">{error}</p> : null}
+      {!error && warnings.length > 0 ? (
+        <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-700">
+          <p className="font-semibold">warnings</p>
+          <ul className="mt-1 list-disc space-y-1 pl-4">
+            {warnings.map((warning, index) => (
+              <li key={`${warning}-${index}`}>{warning}</li>
+            ))}
+          </ul>
+        </div>
       ) : null}
     </section>
   );
@@ -150,7 +157,7 @@ function EmptyState() {
     <div className="grid h-full place-items-center rounded-2xl border border-dashed border-slate-300 text-center text-sm text-slate-500">
       <div>
         <p className="font-medium text-slate-600">No projection yet</p>
-        <p>Enter assumptions on the left and run the projection.</p>
+        <p>Adjust the inputs on the left to generate a projection.</p>
       </div>
     </div>
   );

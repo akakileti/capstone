@@ -23,7 +23,6 @@ def load_plan() -> dict:
         "initialBalance": 25000,
         "annualContribution": 6000,
         "nominalGrowthRate": 0.06,
-        "startingRetirementSpending": 40000,
         "accounts": [
             {
                 "label": "401k",
@@ -48,7 +47,7 @@ def load_plan() -> dict:
 
 
 def extract_series(response_json: list, scenario_kind: str) -> list:
-    return [entry for entry in response_json if entry["scenario"] == scenario_kind]
+    return [entry for entry in response_json["entries"] if entry["scenario"] == scenario_kind]
 
 
 def test_contribution_monotonicity(client):
@@ -70,14 +69,13 @@ def test_contribution_monotonicity(client):
 
 def test_real_nominal_alignment(client):
     plan = load_plan()
-    plan["scenarios"] = [{"kind": "flat", "nominalRate": plan["inflationRate"]}]
+    plan["scenarios"] = [{"kind": "avg", "nominalRate": plan["inflationRate"]}]
     plan["accounts"][0]["contributions"] = []
     plan["spendingSchedule"] = []
-    plan["startingRetirementSpending"] = 0
 
     resp = client.post("/api/calc/accumulation", json=plan)
     assert resp.status_code == 200
-    series = extract_series(resp.get_json(), "flat")
+    series = extract_series(resp.get_json(), "avg")
     real_values = [round(entry["total"]["real"], 2) for entry in series]
     assert max(real_values) - min(real_values) < 1.0
 
@@ -86,7 +84,6 @@ def test_growth_override_improves_outcome(client):
     base_plan = load_plan()
     base_plan["accounts"][0]["initialBalance"] = 50000
     base_plan["accounts"][0]["contributions"] = []
-    base_plan["startingRetirementSpending"] = 0
     base_plan["spendingSchedule"] = []
     base_plan["scenarios"] = [{"kind": "avg", "nominalRate": 0.05}]
 
@@ -108,9 +105,9 @@ def test_growth_override_improves_outcome(client):
 def test_retirement_spending_reduces_balance(client):
     saver_plan = load_plan()
     saver_plan["spendingSchedule"] = []
-    saver_plan["startingRetirementSpending"] = 0
 
     spender_plan = deepcopy(load_plan())
+    spender_plan["spendingSchedule"][0]["annualSpending"] = 500000
 
     saver_resp = client.post("/api/calc/accumulation", json=saver_plan)
     spender_resp = client.post("/api/calc/accumulation", json=spender_plan)
@@ -120,6 +117,7 @@ def test_retirement_spending_reduces_balance(client):
     saver_total = extract_series(saver_resp.get_json(), "avg")[-1]["total"]["nominal"]
     spender_total = extract_series(spender_resp.get_json(), "avg")[-1]["total"]["nominal"]
     assert spender_total < saver_total
+    assert spender_total < 0
 
 
 def test_overlap_validation_returns_400(client):
@@ -131,4 +129,4 @@ def test_overlap_validation_returns_400(client):
     resp = client.post("/api/calc/accumulation", json=bad_plan)
     assert resp.status_code == 400
     body = resp.get_json()
-    assert any("contributions overlap" in message for message in body["detail"])
+    assert any("overlap" in message for message in body["error"])

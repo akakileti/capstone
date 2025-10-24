@@ -1,50 +1,40 @@
-import { useEffect, type ReactNode } from "react";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm } from "react-hook-form";
+import type { ChangeEvent, ReactNode } from "react";
 
 import { formatCurrency } from "../lib/calc";
 import { formatPercentage } from "../lib/number-format";
-import { planSchema, type Plan } from "../lib/schemas";
+import type { Plan } from "../lib/schemas";
 
 interface InputWizardProps {
   plan: Plan;
-  onSubmit: (plan: Plan) => void;
-  loading?: boolean;
+  onPlanChange: (updater: (plan: Plan) => Plan) => void;
 }
 
-export function InputWizard({ plan, onSubmit, loading = false }: InputWizardProps) {
-  const {
-    register,
-    handleSubmit,
-    watch,
-    formState: { errors },
-    reset,
-  } = useForm<Plan>({
-    resolver: zodResolver(planSchema),
-    defaultValues: plan,
-  });
+export function InputWizard({ plan, onPlanChange }: InputWizardProps) {
+  const handleNumberChange =
+    (field: keyof Plan) =>
+    (event: ChangeEvent<HTMLInputElement>) => {
+      const value = Number(event.target.value);
+      if (Number.isNaN(value)) {
+        return;
+      }
+      onPlanChange((current) => ({
+        ...current,
+        [field]: value,
+      }));
+    };
 
-  useEffect(() => {
-    reset(plan);
-  }, [plan, reset]);
+  const startAge = plan.startAge;
+  const retireAge = plan.retireAge;
+  const invalidRetirementAge = retireAge <= startAge;
 
-  const startAge = watch("startAge");
-  const retireAge = watch("retireAge");
-  const initialBalance = watch("initialBalance") ?? plan.initialBalance;
-  const startingRetirementSpending =
-    watch("startingRetirementSpending") ?? plan.startingRetirementSpending;
-  const invalidRetirementAge =
-    startAge !== undefined && retireAge !== undefined && retireAge <= startAge;
+  const inflation = plan.inflationRate;
+  const inflationMargin = plan.inflationMargin;
+  const invest = plan.investmentGrowthRate;
+  const investMargin = plan.investmentGrowthMargin;
 
-  const inflation = watch("inflationRate") ?? plan.inflationRate;
-  const inflationMargin = watch("inflationMargin") ?? plan.inflationMargin;
-  const invest = watch("investmentGrowthRate") ?? plan.investmentGrowthRate;
-  const investMargin = watch("investmentGrowthMargin") ?? plan.investmentGrowthMargin;
-
-  const submit = handleSubmit((values) => onSubmit({ ...plan, ...values }));
-
-  const yearsUntilRetirement = Math.max((retireAge ?? plan.retireAge) - (startAge ?? plan.startAge), 0);
-  const retirementNominal = startingRetirementSpending * Math.pow(1 + inflation, yearsUntilRetirement);
+  const yearsUntilRetirement = Math.max(retireAge - startAge, 0);
+  const retirementNominal =
+    plan.startingRetirementSpending * Math.pow(1 + inflation, yearsUntilRetirement);
 
   const derived = {
     inflationMin: Math.max(inflation - inflationMargin, 0),
@@ -54,72 +44,74 @@ export function InputWizard({ plan, onSubmit, loading = false }: InputWizardProp
   };
 
   return (
-    <form onSubmit={submit} className="grid gap-4">
+    <div className="grid gap-4">
       <SectionCard title="Basic Information">
-        <Field label="Current Age" error={errors.startAge?.message}>
+        <Field label="Current Age">
           <input
             className={inputClassName}
             type="number"
             step="1"
-            {...register("startAge", { valueAsNumber: true })}
+            value={plan.startAge}
+            onChange={handleNumberChange("startAge")}
           />
         </Field>
 
-        <Field label="Retirement Age" error={errors.retireAge?.message}>
+        <Field label="Retirement Age">
           <input
             className={inputClassName}
             type="number"
             step="1"
-            {...register("retireAge", { valueAsNumber: true })}
+            value={plan.retireAge}
+            onChange={handleNumberChange("retireAge")}
           />
           {invalidRetirementAge && (
-            <p className="text-xs text-red-600">Retirement age must be greater than current age.</p>
+            <p className="text-xs text-red-600">retirement age must be greater than current age</p>
           )}
         </Field>
 
-        <Field label="Current Savings (USD)" error={errors.initialBalance?.message}>
+        <Field label="Current Savings (USD)">
           <input
             className={inputClassName}
             type="number"
             step="100"
-            {...register("initialBalance", { valueAsNumber: true })}
+            value={plan.initialBalance}
+            onChange={handleNumberChange("initialBalance")}
           />
         </Field>
 
-        <Field
-          label="Desired Annual Retirement Spending (USD, today&apos;s dollars)"
-          error={errors.startingRetirementSpending?.message}
-        >
+        <Field label="Desired Annual Retirement Spending (USD, today&apos;s dollars)">
           <input
             className={inputClassName}
             type="number"
             step="100"
-            {...register("startingRetirementSpending", { valueAsNumber: true })}
+            value={plan.startingRetirementSpending}
+            onChange={handleNumberChange("startingRetirementSpending")}
           />
         </Field>
 
         <p className="rounded-2xl bg-slate-50 px-4 py-3 text-xs text-slate-600">
-          We&apos;ll pre-fill detailed planning with these figures. Savings feed the first account&apos;s starting
-          balance, and retirement spending seeds the withdrawal schedule. You can fine-tune both later.
+          we use these inputs to seed the detailed planning schedules. tweak the advanced settings any time.
         </p>
       </SectionCard>
 
       <SectionCard title="Growth Assumptions">
         <div className="grid gap-3 sm:grid-cols-2">
-          <Field label="Annual Inflation (decimal)" error={errors.inflationRate?.message}>
+          <Field label="Annual Inflation (decimal)">
             <input
               className={inputClassName}
               type="number"
               step="0.001"
-              {...register("inflationRate", { valueAsNumber: true })}
+              value={plan.inflationRate}
+              onChange={handleNumberChange("inflationRate")}
             />
           </Field>
-          <Field label="Error Margin" error={errors.inflationMargin?.message}>
+          <Field label="Error Margin">
             <input
               className={inputClassName}
               type="number"
               step="0.001"
-              {...register("inflationMargin", { valueAsNumber: true })}
+              value={plan.inflationMargin}
+              onChange={handleNumberChange("inflationMargin")}
             />
           </Field>
         </div>
@@ -130,20 +122,22 @@ export function InputWizard({ plan, onSubmit, loading = false }: InputWizardProp
         />
 
         <div className="grid gap-3 sm:grid-cols-2">
-          <Field label="Investment Growth Rate (decimal)" error={errors.investmentGrowthRate?.message}>
+          <Field label="Investment Growth Rate (decimal)">
             <input
               className={inputClassName}
               type="number"
               step="0.001"
-              {...register("investmentGrowthRate", { valueAsNumber: true })}
+              value={plan.investmentGrowthRate}
+              onChange={handleNumberChange("investmentGrowthRate")}
             />
           </Field>
-          <Field label="Error Margin" error={errors.investmentGrowthMargin?.message}>
+          <Field label="Error Margin">
             <input
               className={inputClassName}
               type="number"
               step="0.001"
-              {...register("investmentGrowthMargin", { valueAsNumber: true })}
+              value={plan.investmentGrowthMargin}
+              onChange={handleNumberChange("investmentGrowthMargin")}
             />
           </Field>
         </div>
@@ -154,32 +148,27 @@ export function InputWizard({ plan, onSubmit, loading = false }: InputWizardProp
         />
 
         <p className="text-xs text-slate-500">
-          We use the margin to calculate the Min and Max scenarios around your average growth assumption.
+          we build min and max scenarios from this average rate and margin.
         </p>
 
         <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-600">
           <p>
-            Current savings: <span className="font-semibold text-slate-900">{formatCurrency(initialBalance)}</span>
+            current savings:{" "}
+            <span className="font-semibold text-slate-900">{formatCurrency(plan.initialBalance)}</span>
           </p>
           <p>
-            Retirement spending (today&apos;s dollars):{" "}
+            retirement spending (today&apos;s dollars):{" "}
             <span className="font-semibold text-slate-900">
-              {formatCurrency(startingRetirementSpending)}
+              {formatCurrency(plan.startingRetirementSpending)}
             </span>
           </p>
           <p className="mt-1">
-            First retirement-year withdrawal ≈ {formatCurrency(retirementNominal)} nominal (assuming {formatPercentage(inflation)} inflation).
+            first retirement-year withdrawal ≈ {formatCurrency(retirementNominal)} nominal (assuming{" "}
+            {formatPercentage(inflation)} inflation).
           </p>
         </div>
       </SectionCard>
-
-      <button
-        className="mt-2 inline-flex items-center justify-center rounded-full bg-slate-900 px-6 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-60"
-        disabled={loading}
-      >
-        {loading ? "Calculating…" : "Run Projection"}
-      </button>
-    </form>
+    </div>
   );
 }
 
@@ -188,16 +177,14 @@ const inputClassName =
 
 interface FieldProps {
   label: string;
-  error?: string;
   children: ReactNode;
 }
 
-function Field({ label, error, children }: FieldProps) {
+function Field({ label, children }: FieldProps) {
   return (
     <label className="grid gap-1 text-sm">
       <span className="font-medium text-slate-700">{label}</span>
       {children}
-      {error && <span className="text-xs text-red-600">{error}</span>}
     </label>
   );
 }

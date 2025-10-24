@@ -12,29 +12,39 @@ from flask import Flask, jsonify, request
 from flask_cors import CORS
 from pydantic import ValidationError
 
+from domain.accumulation import AccumulationPayload, PlanValidationError, accumulations
 from models import Plan
-from domain.accumulation import AccumulationResult, accumulate_plan, prepare_plan
 
 app = Flask(__name__)
-CORS(app, resources={r"/api/*": {"origins": ["http://localhost:3000", "http://localhost:5173"]}})
+CORS(
+    app,
+    resources={
+        r"/api/*": {
+            "origins": [
+                "http://localhost:3000",
+                "http://localhost:5173",
+                "http://127.0.0.1:3000",
+                "http://127.0.0.1:5173",
+            ]
+        }
+    },
+)
 
 
 @app.post("/api/calc/accumulation")
 def accumulation() -> tuple[object, int]:
-    """handle accumulation projections"""
     payload = request.get_json(force=True, silent=False)
     try:
         plan = Plan.model_validate(payload)
     except ValidationError as exc:
         return jsonify({"detail": exc.errors()}), HTTPStatus.BAD_REQUEST
 
-    prepared, validation = prepare_plan(plan)
-    if validation.errors:
-        return jsonify({"detail": validation.errors}), HTTPStatus.BAD_REQUEST
+    try:
+        payload: AccumulationPayload = accumulations(plan, base_year=datetime.utcnow().year)
+    except PlanValidationError as exc:
+        return jsonify({"error": exc.errors}), HTTPStatus.BAD_REQUEST
 
-    result: AccumulationResult = accumulate_plan(prepared, base_year=datetime.utcnow().year)
-    response = [entry.model_dump(by_alias=True) for entry in result.entries]
-    return jsonify(response), HTTPStatus.OK
+    return jsonify(payload.model_dump()), HTTPStatus.OK
 
 
 if __name__ == "__main__":

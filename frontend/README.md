@@ -1,6 +1,6 @@
 # Frontend (React + TypeScript + Vite + Tailwind)
 
-Client-side projection tool that matches the onboarding checklist. Everything runs locally for now; later you can switch `src/lib/api.ts` to call the Flask backend.
+Client-side UI for the detailed compound interest calculator. The app now posts every plan change to the Flask backend and renders the returned scenarios in real time.
 
 ## Available Scripts
 
@@ -19,12 +19,10 @@ npm run lint      # run eslint
 ## Project layout
 
 - `src/App.tsx` – page shell that wires the form and chart together.
-- `src/components/InputWizard.tsx` – multi-section Zod + react-hook-form experience with presets; keeps high-level inputs in sync with the detailed planning schedules.
+- `src/components/InputWizard.tsx` – multi-section control panel that syncs high-level inputs with the detailed planning schedules.
 - `src/components/DetailedPlanningPanel.tsx` – summaries plus entry points for the detailed planning modals.
 - `src/components/SavingsProgressionModal.tsx` / `RetirementSpendingModal.tsx` – configure multi-account contribution schedules and retirement drawdown plans.
 - `src/components/ChartPanel.tsx` – Recharts visualization with min/avg/max cases and nominal/real toggle.
 - `src/lib/schemas.ts` – shared Zod schema for plan inputs.
-- `src/lib/calc.ts` – local projection math and currency formatter.
-- `src/lib/api.ts` – single place to switch from local calc to the Flask API.
-
-When you are ready to call Flask, update `runProjection` in `src/lib/api.ts` and swap the call site in `App.tsx` as described in the guide.
+- `src/lib/calc.ts` – chart helper types, scenario styling, and formatter utilities.
+- `src/lib/api.ts` – axios client that calls the Flask accumulation endpoint and maps the response into chart-ready structures.

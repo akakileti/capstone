@@ -5,7 +5,6 @@
   "initialBalance": 25000,
   "annualContribution": 6000,
   "nominalGrowthRate": 0.06,
-  "startingRetirementSpending": 40000,
   "accounts": [
     {
       "label": "401k",
