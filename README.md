@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 # capstone project
+=======
+# Capstone Project
+>>>>>>> parent of 449066a (added generated readme)
 
 full-stack scaffold for the detailed compound interest calculator.
 
