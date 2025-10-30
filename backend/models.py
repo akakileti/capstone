@@ -4,7 +4,6 @@ from typing import List, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-
 class ContributionRow(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
