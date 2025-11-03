@@ -1,3 +1,10 @@
+# capstone project (generated)
+
+full-stack scaffold for the detailed compound interest calculator.
+
+- `frontend/` – react + vite + typescript + tailwind + recharts ui that streams every plan change to the backend and renders the returned scenarios.
+- `backend/` – flask + pydantic v2 service that validates plans, runs the accumulation engine, and answers `/api/calc/accumulation`.
+
 # Backend Overview
 
 | File | Purpose |
