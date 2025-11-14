@@ -4,7 +4,7 @@ import { SCENARIO_STYLES, type ProjectionCase, type YearPoint } from "./calc";
 import type { Plan } from "./schemas";
 
 const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, "") ?? "http://localhost:5000/api";
+  import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, "") ?? "http://localhost:3000/api";
 
 interface BackendAccountSnapshot {
   label: string;

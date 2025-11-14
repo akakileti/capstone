@@ -335,3 +335,34 @@ def project_savings_with_retirement(
         print(f"age {r.age} | year {r.year} | contrib {r.contribution:.2f} | "
               f"savings.min {r.savings.min:.2f} | savings.avg {r.savings.avg:.2f} | savings.max {r.savings.max:.2f}")
 '''
+
+
+
+# --- Adapter for the frontend chart ---
+
+class ProjectionPoint(BaseModel):
+    age: int
+    nominal: float
+    real: float  # if you don't compute real yet, set equal to nominal
+
+class ProjectionCase(BaseModel):
+    id: str       # e.g. "min" | "avg" | "max"
+    label: str    # e.g. "Min", "Avg", "Max"
+    color: str    # stroke color for the line
+    points: List[ProjectionPoint]
+
+def rows_to_projection_cases(rows: List[YearRowWithSpending]) -> List[ProjectionCase]:
+    """
+    Convert the engine output (rows) to the frontend-friendly shape:
+      ProjectionCase[] where each case has points[{ age, nominal, real }].
+    For now we set real = nominal; you can swap in inflation-adjusted values later.
+    """
+    min_points = [ProjectionPoint(age=r.age, nominal=r.savings.min, real=r.savings.min) for r in rows]
+    avg_points = [ProjectionPoint(age=r.age, nominal=r.savings.avg, real=r.savings.avg) for r in rows]
+    max_points = [ProjectionPoint(age=r.age, nominal=r.savings.max, real=r.savings.max) for r in rows]
+
+    return [
+        ProjectionCase(id="min", label="Min", color="#2563eb", points=min_points),
+        ProjectionCase(id="avg", label="Avg", color="#ef4444", points=avg_points),
+        ProjectionCase(id="max", label="Max", color="#f59e0b", points=max_points),
+    ]
