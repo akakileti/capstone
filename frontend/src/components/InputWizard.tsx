@@ -65,7 +65,7 @@ export function InputWizard({ plan, onPlanChange }: InputWizardProps) {
             onChange={handleNumberChange("retireAge")}
           />
           {invalidRetirementAge && (
-            <p className="text-xs text-red-600">retirement age must be greater than current age</p>
+            <p className="text-xs text-red-600">Retirement age must be greater than current age.</p>
           )}
         </Field>
 
@@ -90,7 +90,8 @@ export function InputWizard({ plan, onPlanChange }: InputWizardProps) {
         </Field>
 
         <p className="rounded-2xl bg-slate-50 px-4 py-3 text-xs text-slate-600">
-          we use these inputs to seed the detailed planning schedules. tweak the advanced settings any time.
+          We&apos;ll pre-fill detailed planning with these figures. Savings feed the first account&apos;s starting
+          balance, and retirement spending seeds the withdrawal schedule. You can fine-tune both later.
         </p>
       </SectionCard>
 
@@ -148,23 +149,21 @@ export function InputWizard({ plan, onPlanChange }: InputWizardProps) {
         />
 
         <p className="text-xs text-slate-500">
-          we build min and max scenarios from this average rate and margin.
+          We use the margin to calculate the Min and Max scenarios around your average growth assumption.
         </p>
 
         <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-600">
           <p>
-            current savings:{" "}
-            <span className="font-semibold text-slate-900">{formatCurrency(plan.initialBalance)}</span>
+            Current savings: <span className="font-semibold text-slate-900">{formatCurrency(plan.initialBalance)}</span>
           </p>
           <p>
-            retirement spending (today&apos;s dollars):{" "}
+            Retirement spending (today&apos;s dollars):{" "}
             <span className="font-semibold text-slate-900">
               {formatCurrency(plan.startingRetirementSpending)}
             </span>
           </p>
           <p className="mt-1">
-            first retirement-year withdrawal ≈ {formatCurrency(retirementNominal)} nominal (assuming{" "}
-            {formatPercentage(inflation)} inflation).
+            First retirement-year withdrawal ≈ {formatCurrency(retirementNominal)} nominal (assuming {formatPercentage(inflation)} inflation).
           </p>
         </div>
       </SectionCard>
