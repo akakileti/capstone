@@ -3,7 +3,7 @@
 full-stack scaffold for the detailed compound interest calculator.
 
 - `frontend/` – react + vite + typescript + tailwind + recharts ui that streams every plan change to the backend and renders the returned scenarios.
-- `backend/` – flask + pydantic v2 service that validates plans, runs the accumulation engine, and answers `/api/calc/accumulation`.
+- `backend/` – flask + pydantic v2 service that runs the savings projection engine behind `/api/projection`.
 
 ## backend quickstart
 
@@ -25,4 +25,4 @@ npm install
 npm run dev
 ```
 
-the dev server runs on `http://localhost:5173` and automatically calls the flask api at `http://localhost:5000/api` for every change.
+the dev server runs on `http://localhost:5173` and automatically calls the flask api at `http://localhost:5000/api/projection` for projections.

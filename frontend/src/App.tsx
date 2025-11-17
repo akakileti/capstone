@@ -101,6 +101,36 @@ const preparePlan = (plan: Plan): Plan => {
   });
 };
 
+function extractValidationMessage(value: unknown): string | null {
+  if (value == null) return null;
+  if (typeof value === "string") return value;
+  if (Array.isArray(value)) {
+    const parts = value
+      .map((entry) => {
+        if (typeof entry === "string") return entry;
+        if (entry && typeof entry === "object") {
+          const typed = entry as { msg?: unknown; loc?: unknown };
+          const message = typeof typed.msg === "string" ? typed.msg : null;
+          const location = Array.isArray(typed.loc) ? typed.loc.join(".") : null;
+          if (message && location) return `${location}: ${message}`;
+          return message;
+        }
+        return null;
+      })
+      .filter((entry): entry is string => Boolean(entry));
+    return parts.length ? parts.join(", ") : null;
+  }
+  if (typeof value === "object") {
+    const typed = value as { msg?: unknown; loc?: unknown };
+    const message = typeof typed.msg === "string" ? typed.msg : null;
+    if (message) {
+      const location = Array.isArray(typed.loc) ? typed.loc.join(".") : null;
+      return location ? `${location}: ${message}` : message;
+    }
+  }
+  return null;
+}
+
 export default function App() {
   const [plan, setPlan] = useState<Plan>(() => preparePlan(defaultPlan));
   const [results, setResults] = useState<ProjectionCase[]>([]);
@@ -130,12 +160,11 @@ export default function App() {
           setWarnings([]);
           if (axios.isAxiosError(err)) {
             const details = err.response?.data;
-            if (Array.isArray(details?.error)) {
-              setError(details.error.join(", "));
-              return;
-            }
-            if (typeof details?.error === "string") {
-              setError(details.error);
+            const message =
+              extractValidationMessage(details?.detail) ??
+              extractValidationMessage(details?.error);
+            if (message) {
+              setError(message);
               return;
             }
           }
@@ -177,7 +206,7 @@ export default function App() {
           </div>
         </nav>
 
-        <div className="mt-10 grid gap-8 lg:grid-cols-[380px,1fr]">
+        <div className="mt-10 grid gap-8 lg:grid-cols-[380px,1fr] lg:items-start">
           <div className="space-y-6">
             <InputWizard plan={plan} onPlanChange={updatePlan} />
             <DetailedPlanningPanel plan={plan} onPlanChange={updatePlan} disabled={loading} />

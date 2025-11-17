@@ -9,3 +9,43 @@
 body {
   @apply bg-white text-gray-900 dark:bg-gray-950 dark:text-gray-100;
 }
+
+.range-input {
+  appearance: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+.range-input:disabled {
+  cursor: not-allowed;
+}
+
+.range-input::-webkit-slider-runnable-track {
+  height: 1px;
+  background: transparent;
+}
+
+.range-input::-webkit-slider-thumb {
+  appearance: none;
+  height: 16px;
+  width: 16px;
+  border-radius: 9999px;
+  background: #0f172a;
+  border: 2px solid #ffffff;
+  margin-top: -7px;
+  box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.15);
+}
+
+.range-input::-moz-range-track {
+  height: 1px;
+  background: transparent;
+}
+
+.range-input::-moz-range-thumb {
+  height: 16px;
+  width: 16px;
+  border-radius: 9999px;
+  background: #0f172a;
+  border: 2px solid #ffffff;
+  box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.15);
+}

@@ -60,7 +60,7 @@ export type Plan = z.infer<typeof planSchema>;
 
 const defaultContribution: ContributionRow = {
   fromAge: 30,
-  base: 6000,
+  base: 10000,
   growthRate: 0.03,
   years: 35,
 };

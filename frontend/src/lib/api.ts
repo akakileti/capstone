@@ -1,28 +1,53 @@
 import axios from "axios";
 
-import { SCENARIO_STYLES, type ProjectionCase, type YearPoint } from "./calc";
+import { SCENARIO_STYLES, type ProjectionCase } from "./calc";
 import type { Plan } from "./schemas";
 
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, "") ?? "http://localhost:3000/api";
+const TARGET_MAX_AGE = 110;
 
-interface BackendAccountSnapshot {
-  label: string;
-  nominal: number;
-  real: number;
+type ScenarioKey = "min" | "avg" | "max";
+type ScenarioInflation = Record<ScenarioKey, number>;
+
+interface ScenarioTriple {
+  min: number;
+  avg: number;
+  max: number;
 }
 
-interface BackendEntry {
-  scenario: string;
+interface ProjectionRow {
   age: number;
   year: number;
-  accounts: BackendAccountSnapshot[];
-  total: { nominal: number; real: number };
+  contribution: number;
+  growth: ScenarioTriple;
+  spending: ScenarioTriple;
+  savings: ScenarioTriple;
 }
 
-interface BackendResponse {
-  entries: BackendEntry[];
-  warnings?: string[];
+interface ProjectionRequestPayload {
+  basicInfo: {
+    currentAge: number;
+    retirementAge: number;
+    currentSavings: number;
+    retirementSpendingRaw: number;
+  };
+  growthAssumptions: {
+    annualInflation: number;
+    inflationErrorMargin: number;
+    investmentReturnRate: number;
+    investmentReturnErrorMargin: number;
+  };
+  savingsPlan: {
+    breakpoints: Array<{
+      fromAge: number;
+      base: number;
+      changeYoY: number;
+      years?: number;
+    }>;
+  };
+  yearsAfterRetirement?: number;
+  spendingChangeYoY?: number;
 }
 
 export interface ProjectionResult {
@@ -31,87 +56,116 @@ export interface ProjectionResult {
 }
 
 export async function runProjection(plan: Plan): Promise<ProjectionResult> {
-  const payload = buildPayload(plan);
-  const response = await axios.post<BackendResponse>(`${API_BASE_URL}/calc/accumulation`, payload);
-  const { entries, warnings = [] } = response.data;
+  const payload = buildProjectionPayload(plan);
+  const inflation = deriveScenarioInflation(plan);
+  const response = await axios.post<ProjectionRow[]>(`${API_BASE_URL}/projection`, payload, {
+    headers: { "Content-Type": "application/json" },
+  });
+  const rows = response.data;
   return {
-    cases: buildCases(entries),
-    warnings,
+    cases: rowsToCases(rows, inflation),
+    warnings: [],
   };
 }
 
-function buildPayload(plan: Plan) {
-  const scenarios = deriveScenarios(plan);
-  const initialBalance = plan.initialBalance ?? 0;
-  const annualContribution = plan.annualContribution ?? 0;
-
+function buildProjectionPayload(plan: Plan): ProjectionRequestPayload {
+  const breakpoints = deriveBreakpoints(plan);
   return {
-    startAge: plan.startAge,
-    retireAge: plan.retireAge,
-    inflationRate: plan.inflationRate,
-    initialBalance,
-    annualContribution,
-    nominalGrowthRate: plan.nominalGrowthRate ?? plan.investmentGrowthRate,
-    accounts: plan.accounts.map((account) => ({
-      label: account.label,
-      initialBalance: account.initialBalance,
-      contributions: account.contributions,
-      growthOverrides: account.growthOverrides,
-    })),
-    spendingSchedule: plan.spendingSchedule,
-    scenarios,
+    basicInfo: {
+      currentAge: plan.startAge,
+      retirementAge: plan.retireAge,
+      currentSavings: plan.initialBalance ?? 0,
+      retirementSpendingRaw: plan.startingRetirementSpending ?? 0,
+    },
+    growthAssumptions: {
+      annualInflation: plan.inflationRate,
+      inflationErrorMargin: plan.inflationMargin,
+      investmentReturnRate: plan.investmentGrowthRate,
+      investmentReturnErrorMargin: plan.investmentGrowthMargin,
+    },
+    savingsPlan: { breakpoints },
+    yearsAfterRetirement: deriveYearsAfterRetirement(plan),
+    spendingChangeYoY: 0,
   };
 }
 
-function deriveScenarios(plan: Plan) {
-  const base = plan.investmentGrowthRate;
-  const margin = plan.investmentGrowthMargin;
-  const clamp = (value: number) => Math.min(Math.max(value, -0.5), 1);
-  return [
-    { kind: "min", nominalRate: clamp(base - margin) },
-    { kind: "avg", nominalRate: clamp(base) },
-    { kind: "max", nominalRate: clamp(base + margin) },
-  ];
+function deriveBreakpoints(plan: Plan) {
+  const primaryAccount = plan.accounts[0];
+  if (primaryAccount && primaryAccount.contributions.length > 0) {
+    return primaryAccount.contributions.map((row) => ({
+      fromAge: row.fromAge,
+      base: row.base,
+      changeYoY: row.growthRate ?? 0,
+      years: row.years,
+    }));
+  }
+
+  if (plan.annualContribution && plan.annualContribution > 0) {
+    const years = Math.max(plan.retireAge - plan.startAge, 0);
+    return [
+      {
+        fromAge: plan.startAge,
+        base: plan.annualContribution,
+        changeYoY: 0,
+        years,
+      },
+    ];
+  }
+
+  return [];
 }
 
-function buildCases(entries: BackendEntry[]): ProjectionCase[] {
-  const grouped = new Map<string, { style: { label: string; color: string }; points: YearPoint[]; baseAge: number }>();
+function deriveYearsAfterRetirement(plan: Plan): number {
+  const spans = plan.spendingSchedule
+    .filter((row) => row.fromAge >= plan.retireAge && typeof row.years === "number")
+    .map((row) => Math.max(row.fromAge - plan.retireAge, 0) + (row.years ?? 0));
+  const derived = spans.length > 0 ? Math.max(...spans) : 0;
+  const toLifeExpectancy = Math.max(0, TARGET_MAX_AGE - plan.retireAge);
+  const fallback = derived > 0 ? derived : 30;
+  return Math.max(fallback, toLifeExpectancy);
+}
 
-  entries.forEach((entry) => {
-    if (!grouped.has(entry.scenario)) {
-      const style = SCENARIO_STYLES[entry.scenario] ?? {
-        label: entry.scenario.toUpperCase(),
-        color: "#475569",
-      };
-      grouped.set(entry.scenario, { style, points: [], baseAge: entry.age });
-    }
+function deriveScenarioInflation(plan: Plan): ScenarioInflation {
+  const inflationAvg = Math.max(plan.inflationRate, 0);
+  const inflationMargin = Math.max(plan.inflationMargin, 0);
+  const inflationMax = Math.max(inflationAvg + inflationMargin, 0);
+  const inflationMin = Math.max(inflationAvg - inflationMargin, 0);
+  return {
+    min: inflationMax,
+    avg: inflationAvg,
+    max: inflationMin,
+  };
+}
 
-    const bucket = grouped.get(entry.scenario)!;
-    bucket.points.push({
-      yearIndex: entry.age - bucket.baseAge,
-      age: entry.age,
-      nominal: entry.total.nominal,
-      real: entry.total.real,
-    });
-  });
+function rowsToCases(rows: ProjectionRow[], inflation: ScenarioInflation): ProjectionCase[] {
+  if (!rows.length) return [];
 
-  const order = ["min", "avg", "max"];
-  const sortedKeys = Array.from(grouped.keys()).sort((a, b) => {
-    const indexA = order.indexOf(a);
-    const indexB = order.indexOf(b);
-    if (indexA === -1 && indexB === -1) return a.localeCompare(b);
-    if (indexA === -1) return 1;
-    if (indexB === -1) return -1;
-    return indexA - indexB;
-  });
-
-  return sortedKeys.map((scenario) => {
-    const bucket = grouped.get(scenario)!;
+  const baseAge = rows[0]?.age ?? 0;
+  const scenarioOrder: ScenarioKey[] = ["min", "avg", "max"];
+  return scenarioOrder.map((scenario) => {
+    const style = SCENARIO_STYLES[scenario] ?? {
+      label: scenario.toUpperCase(),
+      color: "#475569",
+    };
+    const inflationRate = inflation[scenario] ?? 0;
     return {
       id: scenario,
-      label: bucket.style.label,
-      color: bucket.style.color,
-      points: bucket.points,
+      label: style.label,
+      color: style.color,
+      points: rows.map((row, index) => {
+        const yearsSinceStart = row.age - baseAge;
+        const nominal = row.savings[scenario];
+        const real =
+          inflationRate > 0
+            ? nominal / Math.pow(1 + inflationRate, Math.max(yearsSinceStart, 0))
+            : nominal;
+        return {
+          yearIndex: index,
+          age: row.age,
+          nominal,
+          real,
+        };
+      }),
     };
   });
 }
