@@ -2,10 +2,11 @@ import { useEffect, useState } from "react";
 
 import { ChartPanel } from "./components/ChartPanel";
 import { DetailedPlanningPanel } from "./components/DetailedPlanningPanel";
+import { ExportCard } from "./components/ExportCard";
 import { InputWizard } from "./components/InputWizard";
 import axios from "axios";
 
-import { runProjection } from "./lib/api";
+import { runProjection, type ProjectionRow } from "./lib/api";
 import { type ProjectionCase } from "./lib/calc";
 import { defaultPlan, type Account, type Plan } from "./lib/schemas";
 
@@ -134,6 +135,7 @@ function extractValidationMessage(value: unknown): string | null {
 export default function App() {
   const [plan, setPlan] = useState<Plan>(() => preparePlan(defaultPlan));
   const [results, setResults] = useState<ProjectionCase[]>([]);
+  const [projectionRows, setProjectionRows] = useState<ProjectionRow[]>([]);
   const [warnings, setWarnings] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -149,14 +151,16 @@ export default function App() {
     setWarnings([]);
     const timer = setTimeout(() => {
       runProjection(plan)
-        .then(({ cases, warnings }) => {
+        .then(({ cases, warnings, rows }) => {
           if (cancelled) return;
           setResults(cases);
+          setProjectionRows(rows);
           setWarnings(warnings);
         })
         .catch((err) => {
           if (cancelled) return;
           setResults([]);
+          setProjectionRows([]);
           setWarnings([]);
           if (axios.isAxiosError(err)) {
             const details = err.response?.data;
@@ -206,13 +210,14 @@ export default function App() {
           </div>
         </nav>
 
-        <div className="mt-10 grid gap-8 lg:grid-cols-[380px,1fr] lg:items-start">
-          <div className="space-y-6">
-            <InputWizard plan={plan} onPlanChange={updatePlan} />
-            <DetailedPlanningPanel plan={plan} onPlanChange={updatePlan} disabled={loading} />
-          </div>
-          <ChartPanel cases={results} warnings={warnings} loading={loading} error={error} />
+      <div className="mt-10 grid gap-8 lg:grid-cols-[380px,1fr] lg:items-start">
+        <div className="space-y-6">
+          <InputWizard plan={plan} onPlanChange={updatePlan} />
+          <DetailedPlanningPanel plan={plan} onPlanChange={updatePlan} disabled={loading} />
+          <ExportCard plan={plan} rows={projectionRows} loading={loading} />
         </div>
+        <ChartPanel cases={results} warnings={warnings} loading={loading} error={error} />
+      </div>
 
         <footer className="mt-12 text-xs text-slate-500">
           <p>Educational illustration only. Adapt the assumptions to match your financial plan.</p>
