@@ -29,8 +29,10 @@ const ensureAccounts = (plan: Plan): Plan => {
   const baseInitial = plan.initialBalance ?? plan.accounts[0]?.initialBalance ?? 0;
   let accounts = plan.accounts.length ? plan.accounts : [];
 
+  const derivedYears = Math.max(plan.retireAge - plan.startAge, 1);
+
+  // If no accounts exist, create a simple auto-generated schedule.
   if (accounts.length === 0) {
-    const derivedYears = Math.max(plan.retireAge - plan.startAge, 1);
     accounts = [
       {
         label: "General",
@@ -50,6 +52,37 @@ const ensureAccounts = (plan: Plan): Plan => {
         growthOverrides: [],
       },
     ] satisfies Account[];
+  } else {
+    // If the user never customized the schedule (single account, no overrides, <=1 contribution),
+    // keep it in sync with age changes and annual contribution.
+    const primary = accounts[0];
+    const looksAuto =
+      accounts.length === 1 &&
+      primary.growthOverrides.length === 0 &&
+      primary.contributions.length <= 1;
+
+    if (looksAuto) {
+      const base = primary.contributions[0]?.base ?? plan.annualContribution ?? 0;
+      const growthRate = primary.contributions[0]?.growthRate ?? 0;
+      const contributions =
+        base > 0
+          ? [
+              {
+                fromAge: plan.startAge,
+                base,
+                growthRate,
+                years: derivedYears,
+              },
+            ]
+          : [];
+
+      accounts = [
+        {
+          ...primary,
+          contributions,
+        },
+      ];
+    }
   }
 
   const updatedAccounts = accounts.map((account, index) =>
@@ -65,32 +98,57 @@ const ensureAccounts = (plan: Plan): Plan => {
 
 const ensureSpending = (plan: Plan): Plan => {
   const schedule = plan.spendingSchedule.slice().sort((a, b) => a.fromAge - b.fromAge);
-  const hasEntry = schedule.findIndex((row) => row.fromAge === plan.retireAge);
+  const looksAuto = schedule.length <= 1; // treat single (or empty) row as auto-managed
+  const defaultYears = computeDefaultSpendingYears(plan.retireAge);
 
-  if (plan.startingRetirementSpending > 0) {
-    if (hasEntry >= 0) {
-      schedule[hasEntry] = {
-        ...schedule[hasEntry],
-        annualSpending: plan.startingRetirementSpending,
-      };
-    } else {
-      schedule.push({
-        fromAge: plan.retireAge,
-        annualSpending: plan.startingRetirementSpending,
-        years: 25,
-      });
+  let normalized = schedule;
+
+  if (looksAuto) {
+    // Keep a single auto-generated row aligned with the current retirement age.
+    normalized =
+      plan.startingRetirementSpending > 0
+        ? [
+            {
+              fromAge: plan.retireAge,
+              annualSpending: plan.startingRetirementSpending,
+              years: defaultYears,
+            },
+          ]
+        : [];
+  } else {
+    const retireIndex = schedule.findIndex((row) => row.fromAge === plan.retireAge);
+
+    if (plan.startingRetirementSpending > 0) {
+      if (retireIndex >= 0) {
+        normalized[retireIndex] = {
+          ...normalized[retireIndex],
+          annualSpending: plan.startingRetirementSpending,
+        };
+      } else {
+        normalized.push({
+          fromAge: plan.retireAge,
+          annualSpending: plan.startingRetirementSpending,
+          years: defaultYears,
+        });
+      }
+    } else if (retireIndex >= 0) {
+      normalized.splice(retireIndex, 1);
     }
-  } else if (hasEntry >= 0) {
-    schedule.splice(hasEntry, 1);
   }
 
-  const retireRow = schedule.find((row) => row.fromAge === plan.retireAge);
+  const retireRow = normalized.find((row) => row.fromAge === plan.retireAge);
 
   return {
     ...plan,
     startingRetirementSpending: retireRow ? retireRow.annualSpending : 0,
-    spendingSchedule: schedule,
+    spendingSchedule: normalized,
   };
+};
+
+const computeDefaultSpendingYears = (retireAge: number): number => {
+  // Aim to cover until ~85; if retiring at/after 85, extend 10 years beyond retirement.
+  const targetEnd = retireAge >= 85 ? retireAge + 10 : 85;
+  return Math.max(targetEnd - retireAge, 1);
 };
 
 const preparePlan = (plan: Plan): Plan => {
