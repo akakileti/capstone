@@ -90,7 +90,7 @@ def _make_intervals(
     out: List[Tuple[int, int, ContributionBreakpoint]] = []
     for i, row in enumerate(rows_sorted):
         next_start = rows_sorted[i + 1].fromAge if i + 1 < len(rows_sorted) else stop_age
-        # if years is None, run until the next breakpoint; else for `years` years
+        # if years is None, run until the next breakpoint; else for yearss
         end = row.fromAge + (row.years if row.years is not None else max(next_start - row.fromAge, 0))
         if end <= row.fromAge:  # guard against weird inputs
             end = next_start
@@ -165,7 +165,7 @@ def project_savings_table(
         bal_avg *= (1.0 + gavg)
         bal_max *= (1.0 + gmax)
 
-        # 3) record row (rounded a bit for nice output)
+        # 3) record row (rounded a bit for nice output/dollar)
         rows.append(
             YearRow(
                 age=age,
@@ -192,20 +192,20 @@ def project_savings_with_retirement(
     spending_change_yoy: float = 0.0,  # extra real change; 0 = same lifestyle in real terms
 ) -> List[YearRowWithSpending]:
     """
-    Uses all your existing structures, but extends past retirement and applies drawdown.
+    Uses all existing structures, but extends past retirement and applies drawdown.
 
     Conventions:
       - Working years (age < retirementAge):
-            1) Contribution at START of year  (same as your current function)
+            1) Contribution at START of year  (same as current function)
             2) Then apply growth.
       - Retirement years (age >= retirementAge):
             1) Compute spending from retirementSpendingRaw (today's $), per band.
             2) Subtract spending at START of year (can go negative).
             3) Then apply growth.
       - Band pairing:
-            Min  = worst case  = low growth + HIGH inflation (max drawdown)
-            Avg  = middle      = avg growth + avg inflation
-            Max  = best case   = high growth + LOW inflation (light drawdown)
+            Min = worst case = low growth + HIGH inflation (max drawdown)
+            Avg = middle = avg growth + avg inflation
+            Max = best case = high growth + LOW inflation (light drawdown)
     """
 
     s = assumptions.to_scenarios()
@@ -265,7 +265,7 @@ def project_savings_with_retirement(
 
         # ---------- Working years ----------
         if age < basic.retirementAge:
-            # 1) Contribution at START of year (same as your existing logic)
+            # 1) Contribution at START of year (same as existing logic)
             rule = _active_row(intervals, age)
             if rule:
                 t = age - rule.fromAge  # years since this breakpoint began

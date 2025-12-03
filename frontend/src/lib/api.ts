@@ -16,7 +16,7 @@ interface ScenarioTriple {
   max: number;
 }
 
-interface ProjectionRow {
+export interface ProjectionRow {
   age: number;
   year: number;
   contribution: number;
@@ -53,6 +53,7 @@ interface ProjectionRequestPayload {
 export interface ProjectionResult {
   cases: ProjectionCase[];
   warnings: string[];
+  rows: ProjectionRow[];
 }
 
 export async function runProjection(plan: Plan): Promise<ProjectionResult> {
@@ -65,6 +66,7 @@ export async function runProjection(plan: Plan): Promise<ProjectionResult> {
   return {
     cases: rowsToCases(rows, inflation),
     warnings: [],
+    rows,
   };
 }
 
