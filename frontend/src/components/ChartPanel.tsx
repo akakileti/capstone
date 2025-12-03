@@ -61,32 +61,20 @@ export function ChartPanel({ cases, warnings = [], loading = false, error }: Cha
     };
   }, [cases]);
 
+  const defaultRange = useMemo(() => computeDefaultRange(bounds), [bounds]);
+
   useEffect(() => {
-    if (!bounds) {
+    if (!bounds || !defaultRange) {
       setRange(null);
       return;
     }
     setRange((previous) => {
-      const desiredEnd =
-        bounds.minAge < DEFAULT_VIEW_MAX_AGE
-          ? DEFAULT_VIEW_MAX_AGE
-          : Math.min(bounds.minAge + DEFAULT_WINDOW_YEARS, bounds.maxAge);
-      const defaultEnd = Math.min(desiredEnd, bounds.maxAge);
-      if (!previous) {
-        const normalizedEnd =
-          defaultEnd <= bounds.minAge
-            ? Math.min(bounds.maxAge, bounds.minAge + DEFAULT_WINDOW_YEARS)
-            : defaultEnd;
-        return {
-          startAge: bounds.minAge,
-          endAge: normalizedEnd,
-        };
-      }
+      if (!previous) return defaultRange;
       const startAge = clamp(previous.startAge, bounds.minAge, bounds.maxAge - 1);
       const endAge = clamp(previous.endAge, startAge + 1, bounds.maxAge);
       return { startAge, endAge };
     });
-  }, [bounds?.minAge, bounds?.maxAge]);
+  }, [bounds?.minAge, bounds?.maxAge, defaultRange]);
 
   const filteredData = useMemo(() => {
     if (!chartData.length) return [];
@@ -165,6 +153,8 @@ export function ChartPanel({ cases, warnings = [], loading = false, error }: Cha
         <RangeSelector
           range={range}
           bounds={bounds}
+          defaultRange={defaultRange ?? undefined}
+          onReset={() => defaultRange && setRange(defaultRange)}
           onChange={setRange}
           disabled={loading || !hasData}
         />
@@ -188,59 +178,95 @@ export function ChartPanel({ cases, warnings = [], loading = false, error }: Cha
 interface RangeSelectorProps {
   range: ViewRange;
   bounds: RangeBounds;
+  defaultRange?: ViewRange;
   disabled?: boolean;
   onChange: (range: ViewRange) => void;
+  onReset?: () => void;
 }
 
-function RangeSelector({ range, bounds, disabled, onChange }: RangeSelectorProps) {
+function RangeSelector({
+  range,
+  bounds,
+  defaultRange,
+  disabled,
+  onChange,
+  onReset,
+}: RangeSelectorProps) {
   const { minAge, maxAge } = bounds;
   const span = Math.max(maxAge - minAge, 1);
-  const leftPercent = ((range.startAge - minAge) / span) * 100;
-  const rightPercent = 100 - ((range.endAge - minAge) / span) * 100;
+  const thumbInsetPx = 8; // half of 16px thumb so the colored bar aligns with knob centers
+
+  const normalize = (start: number, end: number): ViewRange => {
+    const clampedStart = clamp(start, minAge, maxAge - 1);
+    const clampedEnd = clamp(end, clampedStart + 1, maxAge);
+    return { startAge: clampedStart, endAge: clampedEnd };
+  };
+
+  const normalizedRange = normalize(range.startAge, range.endAge);
+  const leftPercent = clamp(((normalizedRange.startAge - minAge) / span) * 100, 0, 100);
+  const rightPercent = clamp(100 - ((normalizedRange.endAge - minAge) / span) * 100, 0, 100);
 
   const handleStart = (event: ChangeEvent<HTMLInputElement>) => {
     const value = Number(event.target.value);
     if (Number.isNaN(value)) return;
-    const next = clamp(value, minAge, range.endAge - 1);
-    onChange({ startAge: next, endAge: range.endAge });
+    const next = normalize(value, normalizedRange.endAge);
+    onChange(next);
   };
 
   const handleEnd = (event: ChangeEvent<HTMLInputElement>) => {
     const value = Number(event.target.value);
     if (Number.isNaN(value)) return;
-    const next = clamp(value, range.startAge + 1, maxAge);
-    onChange({ startAge: range.startAge, endAge: next });
+    const next = normalize(normalizedRange.startAge, value);
+    onChange(next);
   };
 
   return (
     <div className="mt-6 w-full rounded-3xl border border-slate-200 bg-white px-4 py-4 text-slate-600 shadow-sm sm:px-6">
       <div className="flex flex-wrap items-center justify-between gap-2 text-xs font-semibold text-slate-500">
         <span className="uppercase tracking-tight">View Window</span>
-        <span className="text-slate-800">
-          Ages {range.startAge} – {range.endAge}
-        </span>
+        <div className="flex items-center gap-2 text-slate-800">
+          <span>
+            Ages {range.startAge} – {range.endAge}
+          </span>
+          {defaultRange && onReset ? (
+            <button
+              type="button"
+              onClick={onReset}
+              disabled={disabled}
+              className="rounded-full border border-slate-200 px-2 py-1 text-[11px] font-semibold text-slate-600 transition hover:border-slate-300 hover:text-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Reset
+            </button>
+          ) : null}
+        </div>
       </div>
       <div className="mt-3">
         <div className="relative h-9">
-          <div className="pointer-events-none absolute left-0 right-0 top-1/2 h-0.5 -translate-y-1/2 rounded-full bg-slate-200" />
+          <div
+            className="pointer-events-none absolute top-1/2 h-0.5 -translate-y-1/2 rounded-full bg-slate-200"
+            style={{ left: thumbInsetPx, right: thumbInsetPx }}
+          />
           <div
             className="pointer-events-none absolute top-1/2 h-1 -translate-y-1/2 rounded-full bg-slate-900/30"
-            style={{ left: `${leftPercent}%`, right: `${rightPercent}%` }}
+            style={{
+              left: `calc(${leftPercent}% + ${thumbInsetPx}px)`,
+              right: `calc(${rightPercent}% + ${thumbInsetPx}px)`,
+            }}
           />
           <input
             type="range"
             min={minAge}
-            max={Math.max(minAge, range.endAge - 1)}
-            value={range.startAge}
+            max={Math.max(minAge, normalizedRange.endAge - 1)}
+            value={normalizedRange.startAge}
             onChange={handleStart}
             disabled={disabled}
             className="range-input absolute inset-0 m-0 h-9 w-full cursor-pointer"
           />
           <input
             type="range"
-            min={Math.min(range.startAge + 1, maxAge)}
+            min={Math.min(normalizedRange.startAge + 1, maxAge)}
             max={maxAge}
-            value={range.endAge}
+            value={normalizedRange.endAge}
             onChange={handleEnd}
             disabled={disabled}
             className="range-input absolute inset-0 m-0 h-9 w-full cursor-pointer"
@@ -306,4 +332,21 @@ function EmptyState() {
 function clamp(value: number, min: number, max: number): number {
   if (min >= max) return min;
   return Math.min(Math.max(value, min), max);
+}
+
+function computeDefaultRange(bounds: RangeBounds | null): ViewRange | null {
+  if (!bounds) return null;
+  const desiredEnd =
+    bounds.minAge < DEFAULT_VIEW_MAX_AGE
+      ? DEFAULT_VIEW_MAX_AGE
+      : Math.min(bounds.minAge + DEFAULT_WINDOW_YEARS, bounds.maxAge);
+  const defaultEnd = Math.min(desiredEnd, bounds.maxAge);
+  const normalizedEnd =
+    defaultEnd <= bounds.minAge
+      ? Math.min(bounds.maxAge, bounds.minAge + DEFAULT_WINDOW_YEARS)
+      : defaultEnd;
+  return {
+    startAge: bounds.minAge,
+    endAge: normalizedEnd,
+  };
 }
