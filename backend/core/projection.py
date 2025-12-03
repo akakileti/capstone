@@ -297,19 +297,18 @@ def project_savings_with_retirement(
 
         # ---------- Working years ----------
         if age < basic.retirementAge:
-            # 1) Contribution for the year (no growth until year end)
+            # 1) Calculate contribution for the year (will be added after growth)
             rule = _active_row(intervals, age)
             if rule:
                 t = age - rule.fromAge  # years since this breakpoint began
                 contrib = rule.base * ((1 + rule.changeYoY) ** t)
 
-            # 2) Apply growth to starting balances only
-            start_min, start_avg, start_max = bal_min, bal_avg, bal_max
-            bal_min = start_min * (1 + g_min)
-            bal_avg = start_avg * (1 + g_avg)
-            bal_max = start_max * (1 + g_max)
+            # 2) Apply growth on starting balances only
+            bal_min *= (1 + g_min)
+            bal_avg *= (1 + g_avg)
+            bal_max *= (1 + g_max)
 
-            # 3) Add contribution after growth (not grown this year)
+            # 3) Add this year's contribution (does not grow this year)
             bal_min += contrib
             bal_avg += contrib
             bal_max += contrib
