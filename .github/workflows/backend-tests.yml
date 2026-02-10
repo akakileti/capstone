@@ -31,7 +31,7 @@ jobs:
         run: pytest -q tests/test_projection_regression.py
 
   test-projection-api:
-    name: Test Projection API
+    name: Test Projection API Functionality
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -54,3 +54,28 @@ jobs:
         env:
           PYTHONPATH: .
         run: pytest -q tests/test_projection_api.py
+
+  test-projection-zeroes:
+    name: Test Projection Zeroes
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run zero-input tests
+        env:
+          PYTHONPATH: .
+        run: pytest -q tests/test_projection_zeroes.py
