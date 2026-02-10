@@ -5,8 +5,8 @@ on:
   pull_request:
 
 jobs:
-  test-basic-scenario:
-    name: Test Accuracy of Basic Scenario 
+  test-projection-regression:
+    name: Complete Scenario Test
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -28,4 +28,154 @@ jobs:
       - name: Run tests
         env:
           PYTHONPATH: .
-        run: pytest -q
+        run: pytest -q tests/test_projection_regression.py
+
+  test-projection-api-valid:
+    name: API Projection Valid Payload Test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run API valid payload test
+        env:
+          PYTHONPATH: .
+        run: pytest -q tests/test_projection_api.py::test_projection_endpoint_returns_expected_rows
+
+  test-projection-api-invalid:
+    name: API Projection Invalid Payload Test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run API invalid payload test
+        env:
+          PYTHONPATH: .
+        run: pytest -q tests/test_projection_api.py::test_invalid_payload_returns_400
+
+  test-projection-zeroes:
+    name: Projection All Zeroes Test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run zero-input tests
+        env:
+          PYTHONPATH: .
+        run: pytest -q tests/test_projection_zeroes.py
+
+  test-projection-zero-inflation:
+    name: Zero Inflation Test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run zero-inflation tests
+        env:
+          PYTHONPATH: .
+        run: pytest -q tests/test_zero_inflation.py
+
+  test-projection-zero-growth:
+    name: Zero Growth Test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run zero-growth tests
+        env:
+          PYTHONPATH: .
+        run: pytest -q tests/test_zero_growth.py
+
+  test-projection-zero-spending:
+    name: Zero Spending Test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run zero-spending tests
+        env:
+          PYTHONPATH: .
+        run: pytest -q tests/test_zero_spending.py
