@@ -36,8 +36,11 @@ def test_zero_spending_allows_growth_to_accumulate():
         spending_change_yoy=0.0,
     )
 
-    # Minimum expected balance if no growth: starting 10k + contributions.
-    min_expected = [14000.0, 18000.0, 22000.0]
+    # Floor without growth: starting 10k + contributions (no contribution at retirement age).
+    min_expected = [14000.0, 18000.0, 18000.0]
+    prev = 0.0
     for row, floor in zip(rows, min_expected):
         assert isclose(row.spending.avg, 0.0, abs_tol=0.0)
-        assert row.savings.avg >= floor, "growth should never reduce savings when spending is zero"
+        assert row.savings.avg >= floor, "savings should at least match contributions with no spending"
+        assert row.savings.avg >= prev, "savings should not decrease when there is no spending"
+        prev = row.savings.avg
