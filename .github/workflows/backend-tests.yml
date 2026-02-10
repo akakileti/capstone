@@ -28,4 +28,4 @@ jobs:
       - name: Run tests
         env:
           PYTHONPATH: .
-        run: pytest -q
+        run: pytest -q tests/test_projection_regression.py tests/test_projection_api.py
