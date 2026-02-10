@@ -42,7 +42,7 @@ def test_projection_endpoint_returns_expected_rows():
     expected_last_age = payload["basicInfo"]["retirementAge"] + payload["yearsAfterRetirement"]
     assert rows[-1]["age"] == expected_last_age
 
-    # Ensure we captured spending once the simulated person retires.
+    # Ensure we captured spending once the simulated person retires
     retirement_age = payload["basicInfo"]["retirementAge"]
     retirement_rows = [row for row in rows if row["age"] == retirement_age]
     assert retirement_rows and retirement_rows[0]["spending"]["avg"] > 0
