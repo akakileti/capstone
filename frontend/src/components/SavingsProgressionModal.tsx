@@ -107,6 +107,8 @@ export function SavingsProgressionModal({ plan, onClose, onSave }: SavingsProgre
           label: account.label.trim() || "New Account",
           note: account.note?.trim() ?? "",
           initialBalance: account.initialBalance,
+          taxTreatment: account.taxTreatment,
+          taxRate: account.taxRate ?? 0,
           contributions: sortByAge(account.contributions).map(stripId),
           growthOverrides: sortByAge(account.growthOverrides).map(stripGrowthId),
         }),
@@ -227,6 +229,88 @@ function AccountEditor({
             <p className="rounded-full bg-white px-3 py-1 text-xs font-medium text-slate-600">
               Total scheduled contributions: {formatCurrency(contributionsTotal)} by age {plan.retireAge}
             </p>
+          </div>
+
+          <div className="grid gap-2 rounded-2xl border border-slate-200 bg-white p-3 text-xs text-slate-600">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Tax treatment</p>
+            <div className="flex flex-wrap gap-3 text-sm text-slate-700">
+              <label className="inline-flex items-center gap-2">
+                <input
+                  type="radio"
+                  className="h-4 w-4 text-slate-700"
+                  checked={account.taxTreatment === "none"}
+                  onChange={() =>
+                    onChange((current) => ({
+                      ...current,
+                      taxTreatment: "none",
+                    }))
+                  }
+                />
+                <span className="font-medium">No tax</span>
+              </label>
+              <label className="inline-flex items-center gap-2">
+                <input
+                  type="radio"
+                  className="h-4 w-4 text-slate-700"
+                  checked={account.taxTreatment === "entry"}
+                  onChange={() =>
+                    onChange((current) => ({
+                      ...current,
+                      taxTreatment: "entry",
+                    }))
+                  }
+                />
+                <span className="font-medium">Tax on entry (Roth-style)</span>
+              </label>
+              <label className="inline-flex items-center gap-2">
+                <input
+                  type="radio"
+                  className="h-4 w-4 text-slate-700"
+                  checked={account.taxTreatment === "growth"}
+                  onChange={() =>
+                    onChange((current) => ({
+                      ...current,
+                      taxTreatment: "growth",
+                    }))
+                  }
+                />
+                <span className="font-medium">Tax on gains (brokerage)</span>
+              </label>
+              <label className="inline-flex items-center gap-2">
+                <input
+                  type="radio"
+                  className="h-4 w-4 text-slate-700"
+                  checked={account.taxTreatment === "exit"}
+                  onChange={() =>
+                    onChange((current) => ({
+                      ...current,
+                      taxTreatment: "exit",
+                    }))
+                  }
+                />
+                <span className="font-medium">Tax on withdrawal (401k-style)</span>
+              </label>
+            </div>
+            <div className="grid gap-2 sm:grid-cols-[150px,1fr] sm:items-end">
+              <label className="grid gap-1 text-sm font-medium text-slate-700">
+                Per-account tax rate (decimal)
+                <input
+                  className="w-40 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-400/60 sm:w-32"
+                  type="number"
+                  step="0.001"
+                  value={account.taxRate ?? 0}
+                  onChange={(event) =>
+                    onChange((current) => ({
+                      ...current,
+                      taxRate: Number(event.target.value) || 0,
+                    }))
+                  }
+                />
+              </label>
+              <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+                Applied when {labelTax(account.taxTreatment)}.
+              </div>
+            </div>
           </div>
         </div>
       </header>
@@ -711,6 +795,8 @@ function toEditableAccount(account: Account): EditableAccount {
     ...account,
     id: createId("acct"),
     note: account.note ?? "",
+    taxTreatment: account.taxTreatment ?? "none",
+    taxRate: account.taxRate ?? 0,
     contributions: account.contributions.map((row) => ({ ...row, id: createId("ctr") })),
     growthOverrides: account.growthOverrides.map((row) => ({ ...row, id: createId("grw") })),
   };
@@ -740,6 +826,8 @@ function createBlankAccount(plan: Plan, index = 1): EditableAccount {
     label: `Account ${index}`,
     note: "",
     initialBalance: 0,
+    taxTreatment: "none",
+    taxRate: 0,
     contributions: [baseRow],
     growthOverrides: [],
   };
@@ -766,4 +854,17 @@ function sortAccount(account: EditableAccount): EditableAccount {
     contributions: sortByAge(account.contributions),
     growthOverrides: sortByAge(account.growthOverrides),
   };
+}
+
+function labelTax(treatment: Account["taxTreatment"]): string {
+  switch (treatment) {
+    case "entry":
+      return "taxed on contributions";
+    case "growth":
+      return "taxed on gains";
+    case "exit":
+      return "taxed on withdrawals";
+    default:
+      return "no tax";
+  }
 }

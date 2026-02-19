@@ -148,6 +148,7 @@ export function InputWizard({ plan, onPlanChange }: InputWizardProps) {
           value={`${formatPercentage(derived.growthMin)} – ${formatPercentage(invest)} – ${formatPercentage(derived.growthMax)}`}
         />
 
+
         <p className="text-xs text-slate-500">
           We use the margin to calculate the Min and Max scenarios around your average growth assumption.
         </p>

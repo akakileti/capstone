@@ -38,6 +38,8 @@ const ensureAccounts = (plan: Plan): Plan => {
         label: "General",
         note: "",
         initialBalance: baseInitial,
+        taxTreatment: "none",
+        taxRate: 0,
         contributions:
           plan.annualContribution && plan.annualContribution > 0
             ? [
@@ -79,15 +81,20 @@ const ensureAccounts = (plan: Plan): Plan => {
       accounts = [
         {
           ...primary,
+          taxTreatment: primary.taxTreatment ?? "none",
+          taxRate: primary.taxRate ?? 0,
           contributions,
         },
       ];
     }
   }
 
-  const updatedAccounts = accounts.map((account, index) =>
-    index === 0 ? { ...account, initialBalance: baseInitial } : account,
-  );
+  const updatedAccounts = accounts.map((account, index) => ({
+    ...account,
+    initialBalance: index === 0 ? baseInitial : account.initialBalance ?? 0,
+    taxTreatment: account.taxTreatment ?? "none",
+    taxRate: account.taxRate ?? 0,
+  }));
 
   return {
     ...plan,

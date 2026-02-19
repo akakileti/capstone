@@ -45,6 +45,8 @@ interface ProjectionRequestPayload {
       changeYoY: number;
       years?: number;
     }>;
+    taxTreatment?: string;
+    taxRate?: number;
   };
   yearsAfterRetirement?: number;
   spendingChangeYoY?: number;
@@ -72,6 +74,7 @@ export async function runProjection(plan: Plan): Promise<ProjectionResult> {
 
 function buildProjectionPayload(plan: Plan): ProjectionRequestPayload {
   const breakpoints = deriveBreakpoints(plan);
+  const primary = plan.accounts[0];
   return {
     basicInfo: {
       currentAge: plan.startAge,
@@ -85,7 +88,11 @@ function buildProjectionPayload(plan: Plan): ProjectionRequestPayload {
       investmentReturnRate: plan.investmentGrowthRate,
       investmentReturnErrorMargin: plan.investmentGrowthMargin,
     },
-    savingsPlan: { breakpoints },
+    savingsPlan: {
+      breakpoints,
+      taxTreatment: primary?.taxTreatment ?? "none",
+      taxRate: primary?.taxRate ?? 0,
+    },
     yearsAfterRetirement: deriveYearsAfterRetirement(plan),
     spendingChangeYoY: 0,
   };
