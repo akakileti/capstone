@@ -26,6 +26,12 @@ export const accountSchema = z.object({
   initialBalance: z.number().min(0),
   contributions: z.array(contributionRowSchema).default([]),
   growthOverrides: z.array(growthOverrideRowSchema).default([]),
+  taxTreatment: z
+    .enum(["none", "entry", "growth", "exit"], {
+      errorMap: () => ({ message: "Choose when taxes should apply for this account." }),
+    })
+    .default("none"),
+  taxRate: z.number().min(0).max(1).default(0),
 });
 
 export const spendingRowSchema = z.object({
@@ -57,6 +63,7 @@ export type Account = z.infer<typeof accountSchema>;
 export type SpendingRow = z.infer<typeof spendingRowSchema>;
 export type GrowthScenario = z.infer<typeof scenarioSchema>;
 export type Plan = z.infer<typeof planSchema>;
+export type TaxTreatment = Account["taxTreatment"];
 
 const defaultContribution: ContributionRow = {
   fromAge: 30,
@@ -71,6 +78,8 @@ const defaultAccount: Account = {
   initialBalance: 25_000,
   contributions: [defaultContribution],
   growthOverrides: [],
+  taxTreatment: "none",
+  taxRate: 0,
 };
 
 const defaultSpendingRow: SpendingRow = {

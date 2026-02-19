@@ -111,7 +111,7 @@ function summarizeAccounts(accounts: Account[], retireAge: number): string[] {
 
   return accounts.map((account) => {
     if (!account.contributions.length) {
-      return `${account.label}: no scheduled contributions`;
+      return `${account.label}: no scheduled contributions (${labelTax(account.taxTreatment)}, ${formatPercentage(account.taxRate ?? 0)})`;
     }
 
     const rows = [...account.contributions].sort((a, b) => a.fromAge - b.fromAge);
@@ -124,8 +124,21 @@ function summarizeAccounts(accounts: Account[], retireAge: number): string[] {
       first.growthRate !== 0 ? `, grows ${formatPercentage(first.growthRate)} / yr` : ", flat";
     const breakpointSummary = rows.length > 1 ? ` (${rows.length} breakpoints)` : "";
 
-    return `${account.label}: ${baseSummary}${growthSummary} → age ${endAge}${breakpointSummary}`;
+    return `${account.label}: ${baseSummary}${growthSummary} → age ${endAge}${breakpointSummary} (${labelTax(account.taxTreatment)}, ${formatPercentage(account.taxRate ?? 0)})`;
   });
+}
+
+function labelTax(treatment: Account["taxTreatment"]): string {
+  switch (treatment) {
+    case "entry":
+      return "taxed on contributions";
+    case "growth":
+      return "taxed on gains";
+    case "exit":
+      return "taxed on withdrawals";
+    default:
+      return "no tax";
+  }
 }
 
 function summarizeSpending(rows: SpendingRow[], startAge: number, inflationRate: number): string[] {

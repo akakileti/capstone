@@ -88,6 +88,8 @@ class ContributionBreakpoint(BaseModel):
 
 class SavingsPlan(BaseModel):
     breakpoints: List[ContributionBreakpoint] = []
+    taxTreatment: Optional[str] = "none"  # "none" | "entry" | "growth" | "exit"
+    taxRate: float = 0.0
 
 
 class YearRow(BaseModel):
@@ -138,6 +140,58 @@ def _active_row(
     return None
 
 
+# -----------------------------
+# Tax helpers
+# -----------------------------
+
+class TaxTreatment(str, Enum):
+    NONE = "none"
+    ENTRY = "entry"    # taxed on contributions
+    GROWTH = "growth"  # taxed on gains each year
+    EXIT = "exit"      # taxed on withdrawals
+
+
+def _contribution_after_tax(raw: float, treatment: str, rate: float) -> float:
+    if treatment == TaxTreatment.ENTRY.value:
+        return raw * (1.0 - rate)
+    return raw
+
+
+def _effective_growth_rate(rate: float, treatment: str, tax_rate: float) -> float:
+    if treatment == TaxTreatment.GROWTH.value:
+        return rate * (1.0 - tax_rate)
+    return rate
+
+
+def _withdrawal_gross_up(net_amount: float, treatment: str, tax_rate: float) -> float:
+    if treatment != TaxTreatment.EXIT.value:
+        return net_amount
+    # Avoid divide-by-zero; cap denominator at a tiny epsilon
+    denom = max(1.0 - tax_rate, 1e-6)
+    return net_amount / denom
+
+
+def _apply_capital_gains_withdrawal(
+    net_amount: float, basis: float, tax_rate: float
+) -> tuple[float, float]:
+    """
+    Apply tax only to the gains portion of a withdrawal (capital-gains style).
+
+    - Basis tracks original contributions (already taxed).
+    - Withdrawals first reduce basis; gains are any withdrawal above basis.
+    - Tax is owed on the gains portion only.
+
+    Returns (gross_withdrawal, new_basis).
+    """
+    # Amount that comes from already-taxed basis
+    basis_used = min(net_amount, max(basis, 0.0))
+    taxable = max(0.0, net_amount - basis_used)
+    tax = taxable * tax_rate
+    gross = net_amount + tax
+    new_basis = max(0.0, basis - basis_used)
+    return gross, new_basis
+
+
 def project_savings_table(
     basic: BasicInfo,
     assumptions: GrowthAssumptions,
@@ -155,6 +209,8 @@ def project_savings_table(
     Starts from basic.currentSavings BEFORE the first year's contribution.
     """
     scenarios = assumptions.to_scenarios()  # has scenarios.growth.min/avg/max
+    tax_treatment = getattr(plan, "taxTreatment", "none") or "none"
+    tax_rate = max(0.0, min(1.0, getattr(plan, "taxRate", 0.0) or 0.0))
 
     # if no breakpoints are provided, default to "no contributions"
     default_years = max(0, basic.retirementAge - basic.currentAge)
@@ -187,15 +243,19 @@ def project_savings_table(
 
         # 1) apply growth on starting balance only (contrib added after growth)
         start_min, start_avg, start_max = bal_min, bal_avg, bal_max
-        gmin, gavg, gmax = scenarios.growth.min, scenarios.growth.avg, scenarios.growth.max
+        # Adjust growth rates for tax on gains if applicable
+        gmin = _effective_growth_rate(scenarios.growth.min, tax_treatment, tax_rate)
+        gavg = _effective_growth_rate(scenarios.growth.avg, tax_treatment, tax_rate)
+        gmax = _effective_growth_rate(scenarios.growth.max, tax_treatment, tax_rate)
         bal_min = start_min * (1.0 + gmin)
         bal_avg = start_avg * (1.0 + gavg)
         bal_max = start_max * (1.0 + gmax)
 
         # 2) add this year's contribution (no growth this year)
-        bal_min += contrib
-        bal_avg += contrib
-        bal_max += contrib
+        contrib_after_tax = _contribution_after_tax(contrib, tax_treatment, tax_rate)
+        bal_min += contrib_after_tax
+        bal_avg += contrib_after_tax
+        bal_max += contrib_after_tax
 
         # 3) record row (rounded a bit for nice output/dollar)
         rows.append(
@@ -241,9 +301,13 @@ def project_savings_with_retirement(
     """
 
     s = assumptions.to_scenarios()
+    tax_treatment = getattr(plan, "taxTreatment", "none") or "none"
+    tax_rate = max(0.0, min(1.0, getattr(plan, "taxRate", 0.0) or 0.0))
 
     # Pair growth + inflation for scenarios
-    g_min, g_avg, g_max = s.growth.min, s.growth.avg, s.growth.max
+    g_min = _effective_growth_rate(s.growth.min, tax_treatment, tax_rate)
+    g_avg = _effective_growth_rate(s.growth.avg, tax_treatment, tax_rate)
+    g_max = _effective_growth_rate(s.growth.max, tax_treatment, tax_rate)
     inf_min, inf_avg, inf_max = s.inflation.min, s.inflation.avg, s.inflation.max
 
     # How far to simulate (retirement + N years)
@@ -266,10 +330,13 @@ def project_savings_with_retirement(
 
     year0 = current_year or datetime.now().year
 
-    # Starting balances
+    # Starting balances and basis (contribution principal) per scenario
     bal_min = float(basic.currentSavings)
     bal_avg = float(basic.currentSavings)
     bal_max = float(basic.currentSavings)
+    basis_min = float(basic.currentSavings)
+    basis_avg = float(basic.currentSavings)
+    basis_max = float(basic.currentSavings)
 
     # Base nominal spending at retirement for each band
     years_to_ret = max(0, basic.retirementAge - basic.currentAge)
@@ -302,6 +369,7 @@ def project_savings_with_retirement(
             if rule:
                 t = age - rule.fromAge  # years since this breakpoint began
                 contrib = rule.base * ((1 + rule.changeYoY) ** t)
+                contrib = _contribution_after_tax(contrib, tax_treatment, tax_rate)
 
             # 2) Apply growth on starting balances only
             bal_min *= (1 + g_min)
@@ -312,6 +380,9 @@ def project_savings_with_retirement(
             bal_min += contrib
             bal_avg += contrib
             bal_max += contrib
+            basis_min += contrib
+            basis_avg += contrib
+            basis_max += contrib
 
         # ---------- Retirement years ----------
         else:
@@ -336,10 +407,19 @@ def project_savings_with_retirement(
             prev_spend_avg = spend_avg
             prev_spend_max = spend_max
 
+            if tax_treatment == TaxTreatment.GROWTH.value:
+                spend_min_taxed, basis_min = _apply_capital_gains_withdrawal(spend_min, basis_min, tax_rate)
+                spend_avg_taxed, basis_avg = _apply_capital_gains_withdrawal(spend_avg, basis_avg, tax_rate)
+                spend_max_taxed, basis_max = _apply_capital_gains_withdrawal(spend_max, basis_max, tax_rate)
+            else:
+                spend_min_taxed = _withdrawal_gross_up(spend_min, tax_treatment, tax_rate)
+                spend_avg_taxed = _withdrawal_gross_up(spend_avg, tax_treatment, tax_rate)
+                spend_max_taxed = _withdrawal_gross_up(spend_max, tax_treatment, tax_rate)
+
             # 1) Subtract spending before growth
-            start_min = bal_min - spend_min
-            start_avg = bal_avg - spend_avg
-            start_max = bal_max - spend_max
+            start_min = bal_min - spend_min_taxed
+            start_avg = bal_avg - spend_avg_taxed
+            start_max = bal_max - spend_max_taxed
 
             # 2) Apply growth on the post-spending balance
             bal_min = start_min * (1 + g_min)
