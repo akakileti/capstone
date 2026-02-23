@@ -45,30 +45,9 @@ CORS(
         }
     },
 )
-
-
-@app.after_request
-def add_cors_headers(response):
-    """Ensure all API responses include the required CORS headers."""
-    origin = request.headers.get("Origin", "")
-
-    if origin.rstrip("/") in ALLOWED_ORIGINS:
-        response.headers["Access-Control-Allow-Origin"] = origin
-
-    response.headers["Access-Control-Allow-Credentials"] = "true"
-    response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
-    response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
-    return response
-
-
-@app.route("/api/projection", methods=["POST", "OPTIONS"])
+@app.route("/api/projection", methods=["POST"])
 def projection() -> tuple[object, int]:
     """Return the multi-scenario projection table the frontend expects."""
-    if request.method == "OPTIONS":
-        resp = app.make_response(("", HTTPStatus.NO_CONTENT))
-        resp.headers["Access-Control-Allow-Origin"] = request.headers.get("Origin", "*")
-        return resp
-
     payload = request.get_json(force=True, silent=False)
     try:
         projection_request = ProjectionRequest.model_validate(payload)
