@@ -135,22 +135,31 @@ export default function HomePage({ onStart }: HomePageProps) {
                 <p className="text-xs text-slate-600">Common planning range: 20-30 years</p>
               </div>
             </div>
-            <div className="mt-4 h-20 rounded-xl bg-white px-4 py-3 ring-1 ring-slate-200">
+            <div
+              className="mt-4 rounded-xl bg-white px-4 py-4 ring-1 ring-slate-200"
+              aria-label="Common retirement planning range is 20 to 30 years on a 0 to 40 year scale."
+            >
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-600 mb-2">
+                Common planning range
+              </p>
               <div className="relative h-3 rounded-full bg-slate-100">
-                <div className="absolute inset-y-0 left-0 right-0 mx-[10%] rounded-full bg-slate-300" />
-                <div className="absolute inset-y-0 left-0 right-0 mx-[20%] rounded-full bg-slate-900/10" />
-                <div className="absolute inset-y-0 left-0 right-0 mx-[25%] rounded-full bg-slate-900/20" />
-                <div className="absolute inset-y-0 left-0 right-0 mx-[30%] rounded-full bg-slate-900/10" />
-                <div className="absolute inset-y-0 left-0 right-0 mx-[40%] rounded-full bg-slate-900/5" />
-                <div className="absolute left-[10%] top-1/2 h-5 w-[2px] -translate-y-1/2 bg-slate-700" />
-                <div className="absolute left-[25%] top-1/2 h-5 w-[2px] -translate-y-1/2 bg-slate-700" />
-                <div className="absolute left-[30%] top-1/2 h-5 w-[2px] -translate-y-1/2 bg-slate-700" />
-                <div className="absolute left-[40%] top-1/2 h-5 w-[2px] -translate-y-1/2 bg-slate-700" />
+                {[0, 25, 50, 75, 100].map((pct) => (
+                  <span
+                    key={pct}
+                    className="absolute -top-1 h-5 w-[1px] bg-slate-300"
+                    style={{ left: `${pct}%`, transform: "translateX(-50%)" }}
+                    aria-hidden
+                  />
+                ))}
+                <div
+                  className="absolute inset-y-0 rounded-full bg-slate-400"
+                  style={{ left: "50%", right: "25%" }}
+                />
               </div>
               <div className="mt-2 flex justify-between text-[11px] text-slate-500">
                 <span>0 yrs</span>
+                <span>10</span>
                 <span>20</span>
-                <span>25</span>
                 <span>30</span>
                 <span>40</span>
               </div>
