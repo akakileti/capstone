@@ -1,10 +1,10 @@
 import axios from "axios";
 
+import { API_BASE_URL } from "./apiBase";
 import { SCENARIO_STYLES, type ProjectionCase } from "./calc";
 import type { Plan } from "./schemas";
 
-const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, "") ?? "http://localhost:3000/api";
+const API_PREFIX = `${API_BASE_URL}/api`;
 const TARGET_MAX_AGE = 110;
 
 type ScenarioKey = "min" | "avg" | "max";
@@ -61,7 +61,7 @@ export interface ProjectionResult {
 export async function runProjection(plan: Plan): Promise<ProjectionResult> {
   const payload = buildProjectionPayload(plan);
   const inflation = deriveScenarioInflation(plan);
-  const response = await axios.post<ProjectionRow[]>(`${API_BASE_URL}/projection`, payload, {
+  const response = await axios.post<ProjectionRow[]>(`${API_PREFIX}/projection`, payload, {
     headers: { "Content-Type": "application/json" },
   });
   const rows = response.data;
