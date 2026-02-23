@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+import os
 from datetime import datetime
 from http import HTTPStatus
 
@@ -15,14 +16,32 @@ from pydantic import ValidationError
 from core.projection import ProjectionRequest, project_savings_with_retirement
 
 app = Flask(__name__)
+
+
+def _load_allowed_origins() -> set[str]:
+    """Compose the allowed origins from defaults plus a comma-separated env var."""
+    defaults = {
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+    }
+    raw_env = os.getenv("CORS_ORIGINS", "")
+    env_origins = {
+        origin.strip().rstrip("/")
+        for origin in raw_env.split(",")
+        if origin.strip()
+    }
+    return {origin for origin in (defaults | env_origins) if origin}
+
+
+ALLOWED_ORIGINS = _load_allowed_origins()
+
 CORS(
     app,
     resources={
         r"/api/*": {
-            "origins": [
-                "http://localhost:5173",
-                "http://127.0.0.1:5173",
-            ]
+            "origins": list(ALLOWED_ORIGINS),
         }
     },
 )
@@ -32,17 +51,9 @@ CORS(
 def add_cors_headers(response):
     """Ensure all API responses include the required CORS headers."""
     origin = request.headers.get("Origin", "")
-    allowed_origins = {
-        "http://localhost:3000",
-        "http://localhost:5173",
-        "http://127.0.0.1:3000",
-        "http://127.0.0.1:5173",
-    }
 
-    if origin in allowed_origins:
+    if origin.rstrip("/") in ALLOWED_ORIGINS:
         response.headers["Access-Control-Allow-Origin"] = origin
-    else:
-        response.headers["Access-Control-Allow-Origin"] = "*"
 
     response.headers["Access-Control-Allow-Credentials"] = "true"
     response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
@@ -82,6 +93,11 @@ def projection() -> tuple[object, int]:
     )
 
     return jsonify([row.model_dump() for row in rows]), HTTPStatus.OK
+
+
+@app.route("/health", methods=["GET"])
+def health():
+    return "ok", HTTPStatus.OK
 
 
 if __name__ == "__main__":
