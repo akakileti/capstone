@@ -1,10 +1,10 @@
 import axios from "axios";
 
-import { API_BASE_URL } from "./apiBase";
+import { API_BASE_URL, API_CONFIG_ERROR } from "./apiBase";
 import { SCENARIO_STYLES, type ProjectionCase } from "./calc";
 import type { Plan } from "./schemas";
 
-const API_PREFIX = `${API_BASE_URL}/api`;
+const API_PREFIX = API_BASE_URL ? `${API_BASE_URL}/api` : null;
 const TARGET_MAX_AGE = 110;
 
 type ScenarioKey = "min" | "avg" | "max";
@@ -59,6 +59,12 @@ export interface ProjectionResult {
 }
 
 export async function runProjection(plan: Plan): Promise<ProjectionResult> {
+  if (API_CONFIG_ERROR || !API_PREFIX) {
+    const message = API_CONFIG_ERROR ?? "API base URL is not configured";
+    console.error(message);
+    throw new Error(message);
+  }
+
   const payload = buildProjectionPayload(plan);
   const inflation = deriveScenarioInflation(plan);
   const response = await axios.post<ProjectionRow[]>(`${API_PREFIX}/projection`, payload, {

@@ -6,6 +6,7 @@ import { ExportCard } from "./components/ExportCard";
 import { InputWizard } from "./components/InputWizard";
 import axios from "axios";
 
+import { API_CONFIG_ERROR } from "./lib/apiBase";
 import { runProjection, type ProjectionRow } from "./lib/api";
 import { type ProjectionCase } from "./lib/calc";
 import { defaultPlan, type Account, type Plan } from "./lib/schemas";
@@ -152,6 +153,10 @@ const ensureSpending = (plan: Plan): Plan => {
   };
 };
 
+if (API_CONFIG_ERROR) {
+  console.error(API_CONFIG_ERROR);
+}
+
 const computeDefaultSpendingYears = (retireAge: number): number => {
   // Aim to cover until ~85; if retiring at/after 85, extend 10 years beyond retirement.
   const targetEnd = retireAge >= 85 ? retireAge + 10 : 85;
@@ -211,6 +216,18 @@ export default function App() {
 
   useEffect(() => {
     let cancelled = false;
+
+    if (API_CONFIG_ERROR) {
+      setLoading(false);
+      setError(API_CONFIG_ERROR);
+      setResults([]);
+      setProjectionRows([]);
+      setWarnings([]);
+      return () => {
+        cancelled = true;
+      };
+    }
+
     setLoading(true);
     setError(null);
     setWarnings([]);
@@ -250,6 +267,19 @@ export default function App() {
       clearTimeout(timer);
     };
   }, [plan]);
+
+  if (API_CONFIG_ERROR) {
+    return (
+      <div className="min-h-screen bg-white text-slate-900">
+        <div className="mx-auto max-w-3xl px-6 py-10">
+          <h1 className="text-2xl font-semibold text-red-700">Configuration error</h1>
+          <p className="mt-3 text-sm text-slate-700">
+            Backend URL is missing. Set <code>VITE_API_BASE_URL</code> in your environment and redeploy.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-white text-slate-900">
