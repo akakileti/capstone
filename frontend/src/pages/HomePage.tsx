@@ -51,28 +51,58 @@ const rollingReturns = [
 ];
 
 const spendingShift = [
+  { label: "Under 25", amount: 47283 },
+  { label: "25-34", amount: 74475 },
+  { label: "35-44", amount: 91229 },
+  { label: "45-54", amount: 100327 },
+  { label: "55-64", amount: 84946 },
   { label: "65-74", amount: 65354 },
   { label: "75+", amount: 55834 },
 ];
 
 const inflationContext = [
-  { year: 1995, cpi: 2.8 },
-  { year: 2000, cpi: 3.4 },
-  { year: 2005, cpi: 3.4 },
-  { year: 2010, cpi: 1.6 },
-  { year: 2015, cpi: 0.1 },
-  { year: 2020, cpi: 1.2 },
-  { year: 2022, cpi: 6.5 },
-  { year: 2023, cpi: 3.1 },
-  { year: 2024, cpi: 2.9 },
+  { year: "1995", cpi: 2.8054196885 },
+  { year: "1996", cpi: 2.9312041999 },
+  { year: "1997", cpi: 2.3376899373 },
+  { year: "1998", cpi: 1.5522790987 },
+  { year: "1999", cpi: 2.188027197 },
+  { year: "2000", cpi: 3.3768572715 },
+  { year: "2001", cpi: 2.8261711189 },
+  { year: "2002", cpi: 1.5860316265 },
+  { year: "2003", cpi: 2.2700949734 },
+  { year: "2004", cpi: 2.6772366931 },
+  { year: "2005", cpi: 3.3927468455 },
+  { year: "2006", cpi: 3.2259441007 },
+  { year: "2007", cpi: 2.8526724815 },
+  { year: "2008", cpi: 3.8391002967 },
+  { year: "2009", cpi: -0.3555462663 },
+  { year: "2010", cpi: 1.6400434424 },
+  { year: "2011", cpi: 3.1568415686 },
+  { year: "2012", cpi: 2.0693372653 },
+  { year: "2013", cpi: 1.4648326556 },
+  { year: "2014", cpi: 1.6222229774 },
+  { year: "2015", cpi: 0.1186271356 },
+  { year: "2016", cpi: 1.2615832057 },
+  { year: "2017", cpi: 2.1301100037 },
+  { year: "2018", cpi: 2.4425832969 },
+  { year: "2019", cpi: 1.8122100753 },
+  { year: "2020", cpi: 1.2335843963 },
+  { year: "2021", cpi: 4.6978588636 },
+  { year: "2022", cpi: 8.0027998205 },
+  { year: "2023", cpi: 4.1163383837 },
+  { year: "2024", cpi: 2.9495252049 },
 ];
 
 const savingsReality = [
-  { band: "35-44", value: 45_000 },
-  { band: "45-54", value: 115_000 },
-  { band: "55-64", value: 185_000 },
-  { band: "65-74", value: 200_000 },
+  { band: "Less than 35", value: 18.88 },
+  { band: "35-44", value: 45.0 },
+  { band: "45-54", value: 115.0 },
+  { band: "55-64", value: 185.0 },
+  { band: "65-74", value: 200.0 },
+  { band: "75+", value: 130.0 },
 ];
+
+const inflationTicks = inflationContext.filter((_, index) => index % 5 === 0).map((d) => d.year);
 
 const formatCurrencyCompact = (value: number) => {
   if (Math.abs(value) >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`;
@@ -205,7 +235,7 @@ export default function HomePage({ onStart }: HomePageProps) {
                   <XAxis dataKey="start" tick={{ fontSize: 12, fill: "#475569" }} />
                   <YAxis tickFormatter={(v) => `${v}%`} tick={{ fontSize: 12, fill: "#475569" }} />
                   <Tooltip formatter={(v: number) => `${v}%`} />
-                  <ReferenceLine y={4} label={{ value: "long-run average", position: "right", fontSize: 10, fill: "#475569" }} stroke="#cbd5e1" strokeDasharray="4 4" />
+                  <ReferenceLine y={4} stroke="#cbd5e1" strokeDasharray="4 4" />
                   <defs>
                     <linearGradient id="returnsArea" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="0%" stopColor="#0ea5e9" stopOpacity={0.18} />
@@ -230,7 +260,7 @@ export default function HomePage({ onStart }: HomePageProps) {
             <div className="flex items-start justify-between">
               <div>
                 <h3 className="text-sm font-semibold text-slate-900">Spending Changes</h3>
-                <p className="text-xs text-slate-600">Average annual spending by age band (USD).</p>
+                <p className="text-xs text-slate-600">Average annual expenditures by age band (2024, USD).</p>
               </div>
             </div>
             <div className="mt-3 h-48" aria-label="Spending by age chart">
@@ -244,7 +274,7 @@ export default function HomePage({ onStart }: HomePageProps) {
                 </BarChart>
               </ResponsiveContainer>
             </div>
-            <p className="mt-3 text-xs text-slate-600">Spending patterns shift with age.</p>
+            <p className="mt-3 text-xs text-slate-600">Source: BLS Consumer Expenditure Survey, 2024</p>
           </div>
         </div>
       </section>
@@ -257,7 +287,7 @@ export default function HomePage({ onStart }: HomePageProps) {
         <div className="grid gap-4 md:grid-cols-3">
           {[
             {
-              label: "39% of households are at risk of not maintaining their pre-retirement living standard in retirement.",
+              label: "39% of households will not be able to maintain their pre-retirement living standard in retirement.",
               source: "Source: Boston College CRR (NRR I)",
             },
             {
@@ -283,7 +313,7 @@ export default function HomePage({ onStart }: HomePageProps) {
       <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
         <header className="mb-4">
           <h2 className="text-lg font-semibold text-slate-900">Savings Reality</h2>
-          <p className="text-sm text-slate-600">Median retirement savings varies significantly by age.</p>
+          <p className="text-sm text-slate-600">Median retirement savings by age band (2022).</p>
         </header>
         <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 shadow-inner">
           <div className="h-64" aria-label="Median retirement savings by age chart">
@@ -291,14 +321,17 @@ export default function HomePage({ onStart }: HomePageProps) {
               <BarChart data={savingsReality} margin={{ top: 10, right: 12, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="4 4" stroke="#e2e8f0" />
                 <XAxis dataKey="band" tick={{ fontSize: 12, fill: "#475569" }} />
-                <YAxis tickFormatter={formatCurrencyCompact} tick={{ fontSize: 12, fill: "#475569" }} />
-                <Tooltip formatter={(v: number) => `$${v.toLocaleString()}`} />
+                <YAxis
+                  tickFormatter={(v) => `$${v.toFixed(0)}k`}
+                  tick={{ fontSize: 12, fill: "#475569" }}
+                />
+                <Tooltip formatter={(v: number) => `$${Math.round(v * 1000).toLocaleString()}`} />
                 <Bar dataKey="value" name="Median balance" fill="#6366f1" radius={[10, 10, 6, 6]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
           <p className="mt-3 text-xs text-slate-600">
-            Median retirement account balances increase with age but often remain below what full retirement funding would require.
+            Units are thousands of 2022 dollars.
           </p>
           <p className="text-[11px] uppercase tracking-wide text-slate-500 mt-2">Source: Federal Reserve Survey of Consumer Finances</p>
         </div>
@@ -308,17 +341,27 @@ export default function HomePage({ onStart }: HomePageProps) {
         <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 shadow-inner">
           <div className="flex items-start justify-between">
             <div>
-              <h2 className="text-lg font-semibold text-slate-900">Typical baseline assumptions</h2>
-              <p className="text-sm text-slate-600">Recent inflation gives context for planning inputs.</p>
+              <h2 className="text-lg font-semibold text-slate-900">Typical Baseline Assumptions</h2>
+              <p className="text-sm text-slate-600">Annual inflation (1995–2024).</p>
             </div>
           </div>
           <div className="mt-4 h-52" aria-label="Inflation history chart">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={inflationContext} margin={{ top: 10, right: 12, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="4 4" stroke="#e2e8f0" />
-                <XAxis dataKey="year" tick={{ fontSize: 12, fill: "#475569" }} />
-                <YAxis domain={[0, 8]} tickFormatter={(v) => `${v}%`} tick={{ fontSize: 12, fill: "#475569" }} />
-                <Tooltip formatter={(v: number) => `${v}%`} />
+                <XAxis
+                  dataKey="year"
+                  type="category"
+                  ticks={inflationTicks}
+                  tick={{ fontSize: 12, fill: "#475569" }}
+                />
+                <YAxis
+                  domain={["dataMin", "dataMax"]}
+                  tickFormatter={(v) => `${Math.round(v)}%`}
+                  tick={{ fontSize: 12, fill: "#475569" }}
+                  allowDecimals={false}
+                />
+                <Tooltip formatter={(v: number) => `${v.toFixed(2)}%`} />
                 <Line type="monotone" dataKey="cpi" name="CPI YoY%" stroke="#0ea5e9" strokeWidth={2} dot={{ r: 3 }} />
                 <ReferenceLine y={3} stroke="#cbd5e1" strokeDasharray="4 4" />
               </LineChart>
