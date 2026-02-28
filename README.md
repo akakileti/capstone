@@ -2,6 +2,9 @@
 
 Plan, compare, and project long-term retirement outcomes without linking accounts. Built for young professionals who want transparent, scenario-based projections that show how inflation, returns, and spending choices shape retirement runway.
 
+## Live Site
+- [https://capstone-alpha-blond.vercel.app/](https://capstone-alpha-blond.vercel.app/)
+
 ## Architecture at a glance
 - **Frontend:** React + TypeScript + Vite + Tailwind + Recharts (`frontend/`). Renders the calculator UI and homepage, calls the backend via REST.
 - **Backend:** Flask API with Pydantic validation (`backend/`). Provides a deterministic projection engine (min/avg/max scenarios) and returns year-by-year rows.
@@ -39,10 +42,6 @@ No automated frontend tests are present.
 ## Deployment notes
 - Frontend: deployable to Vercel (static build via `npm run build`).
 - Backend: deployable to Render (Flask service). Cold starts on Render can take ~3 minutes before the API responds.
-
-## Links
-- Live site: [https://capstone-alpha-blond.vercel.app/](https://capstone-alpha-blond.vercel.app/)
-- Video walkthrough: _will add link later_
 
 ## Limitations / assumptions
 - Deterministic min/avg/max scenarios; no Monte Carlo simulation.
