@@ -41,8 +41,8 @@ No automated frontend tests are present.
 - Backend: deployable to Render (Flask service). Cold starts on Render can take ~3 minutes before the API responds.
 
 ## Links
-- Live site: _add link when deployed_
-- Video walkthrough: _add link when recorded_
+- Live site: [https://capstone-alpha-blond.vercel.app/](https://capstone-alpha-blond.vercel.app/)
+- Video walkthrough: _will add link later_
 
 ## Limitations / assumptions
 - Deterministic min/avg/max scenarios; no Monte Carlo simulation.
