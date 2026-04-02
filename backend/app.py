@@ -52,7 +52,16 @@ def projection() -> tuple[object, int]:
     try:
         projection_request = ProjectionRequest.model_validate(payload)
     except ValidationError as exc:
-        return jsonify({"detail": exc.errors()}), HTTPStatus.BAD_REQUEST
+        def _stringify_errors(errors: list[dict]) -> list[dict]:
+            cleaned = []
+            for err in errors:
+                ctx = err.get("ctx")
+                if ctx:
+                    ctx = {key: str(value) for key, value in ctx.items()}
+                cleaned.append({**err, "ctx": ctx} if ctx is not None else {**err})
+            return cleaned
+
+        return jsonify({"detail": _stringify_errors(exc.errors())}), HTTPStatus.BAD_REQUEST
 
     rows = project_savings_with_retirement(
         basic=projection_request.basicInfo,
