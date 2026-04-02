@@ -78,7 +78,7 @@ jobs:
       - name: Run API invalid payload test
         env:
           PYTHONPATH: .
-        run: pytest -q tests/test_projection_api.py::test_invalid_payload_returns_400
+        run: pytest -q tests/test_projection_api.py
 
   test-projection-zeroes:
     name: Projection All Zeroes Test

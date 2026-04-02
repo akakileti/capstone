@@ -55,3 +55,16 @@ def test_invalid_payload_returns_400():
     assert resp.status_code == 400
     body = resp.get_json()
     assert "detail" in body
+
+
+def test_negative_ages_are_rejected():
+    payload = projection_payload()
+    payload["basicInfo"]["currentAge"] = -5
+    payload["basicInfo"]["retirementAge"] = -1
+
+    with flask_app.test_client() as client:
+        resp = client.post("/api/projection", json=payload)
+
+    assert resp.status_code == 400
+    body = resp.get_json()
+    assert any("non-negative" in err.get("msg", "") for err in body.get("detail", [])), body

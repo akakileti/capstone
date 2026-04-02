@@ -4,7 +4,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Dict, List, Optional, Tuple
 
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator, model_validator
 
 
 # -----------------------------
@@ -17,6 +17,19 @@ class BasicInfo(BaseModel):
     retirementAge: int
     currentSavings: float
     retirementSpendingRaw: float
+
+    @field_validator("currentAge", "retirementAge")
+    @classmethod
+    def _age_must_be_non_negative(cls, value: int, info):
+        if value < 0:
+            raise ValueError(f"{info.field_name} must be non-negative")
+        return value
+
+    @model_validator(mode="after")
+    def _retirement_after_current(self) -> "BasicInfo":
+        if self.retirementAge <= self.currentAge:
+            raise ValueError("retirementAge must be greater than currentAge")
+        return self
 
 
 class ScenarioValues(BaseModel):

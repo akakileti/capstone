@@ -10,6 +10,13 @@ interface InputWizardProps {
 }
 
 export function InputWizard({ plan, onPlanChange }: InputWizardProps) {
+  const fieldMin: Partial<Record<keyof Plan, number>> = {
+    startAge: 0,
+    retireAge: 0,
+    initialBalance: 0,
+    startingRetirementSpending: 0,
+  };
+
   const handleNumberChange =
     (field: keyof Plan) =>
     (event: ChangeEvent<HTMLInputElement>) => {
@@ -17,9 +24,11 @@ export function InputWizard({ plan, onPlanChange }: InputWizardProps) {
       if (Number.isNaN(value)) {
         return;
       }
+      const minValue = fieldMin[field] ?? Number.NEGATIVE_INFINITY;
+      const sanitized = Math.max(value, minValue);
       onPlanChange((current) => ({
         ...current,
-        [field]: value,
+        [field]: sanitized,
       }));
     };
 
@@ -51,6 +60,7 @@ export function InputWizard({ plan, onPlanChange }: InputWizardProps) {
             className={inputClassName}
             type="number"
             step="1"
+            min={0}
             value={plan.startAge}
             onChange={handleNumberChange("startAge")}
           />
@@ -61,6 +71,7 @@ export function InputWizard({ plan, onPlanChange }: InputWizardProps) {
             className={inputClassName}
             type="number"
             step="1"
+            min={0}
             value={plan.retireAge}
             onChange={handleNumberChange("retireAge")}
           />

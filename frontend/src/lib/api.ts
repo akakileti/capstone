@@ -3,6 +3,7 @@ import axios from "axios";
 import { API_BASE_URL, API_CONFIG_ERROR } from "./apiBase";
 import { SCENARIO_STYLES, type ProjectionCase } from "./calc";
 import type { Plan } from "./schemas";
+import { expandContributionByAge, fallbackAccounts } from "./schedules";
 
 const API_PREFIX = API_BASE_URL ? `${API_BASE_URL}/api` : null;
 const TARGET_MAX_AGE = 110;
@@ -80,12 +81,13 @@ export async function runProjection(plan: Plan): Promise<ProjectionResult> {
 
 function buildProjectionPayload(plan: Plan): ProjectionRequestPayload {
   const breakpoints = deriveBreakpoints(plan);
-  const primary = plan.accounts[0];
+  const primary = fallbackAccounts(plan)[0];
+  const totalInitialBalance = aggregateInitialBalance(plan);
   return {
     basicInfo: {
       currentAge: plan.startAge,
       retirementAge: plan.retireAge,
-      currentSavings: plan.initialBalance ?? 0,
+      currentSavings: totalInitialBalance,
       retirementSpendingRaw: plan.startingRetirementSpending ?? 0,
     },
     growthAssumptions: {
@@ -105,21 +107,26 @@ function buildProjectionPayload(plan: Plan): ProjectionRequestPayload {
 }
 
 function deriveBreakpoints(plan: Plan) {
-  const primaryAccount = plan.accounts[0];
-  if (primaryAccount && primaryAccount.contributions.length > 0) {
-    return primaryAccount.contributions.map((row) => ({
-      fromAge: row.fromAge,
-      base: row.base,
-      changeYoY: row.growthRate ?? 0,
-      years: row.years,
-    }));
-  }
+  const accounts = fallbackAccounts(plan);
+  const startAge = plan.startAge;
+  const endAge = plan.retireAge;
 
-  if (plan.annualContribution && plan.annualContribution > 0) {
-    const years = Math.max(plan.retireAge - plan.startAge, 0);
+  const totalsByAge = new Map<number, number>();
+
+  accounts.forEach((account) => {
+    const schedule = expandContributionByAge(account.contributions, startAge, endAge);
+    schedule.forEach((amount, age) => {
+      totalsByAge.set(age, (totalsByAge.get(age) ?? 0) + amount);
+    });
+  });
+
+  if (totalsByAge.size === 0 && plan.annualContribution && plan.annualContribution > 0) {
+    const years = Math.max(endAge - startAge, 0);
+    totalsByAge.set(startAge, plan.annualContribution);
+    // Preserve legacy single-contribution behavior if no accounts are configured
     return [
       {
-        fromAge: plan.startAge,
+        fromAge: startAge,
         base: plan.annualContribution,
         changeYoY: 0,
         years,
@@ -127,7 +134,20 @@ function deriveBreakpoints(plan: Plan) {
     ];
   }
 
-  return [];
+  return Array.from(totalsByAge.entries())
+    .sort(([ageA], [ageB]) => ageA - ageB)
+    .map(([age, amount]) => ({
+      fromAge: age,
+      base: amount,
+      changeYoY: 0,
+      years: 1,
+    }));
+}
+
+function aggregateInitialBalance(plan: Plan): number {
+  const accounts = fallbackAccounts(plan);
+  if (!accounts.length) return plan.initialBalance ?? 0;
+  return accounts.reduce((sum, account) => sum + (account.initialBalance ?? 0), 0);
 }
 
 function deriveYearsAfterRetirement(plan: Plan): number {

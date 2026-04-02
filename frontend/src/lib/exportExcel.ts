@@ -3,6 +3,13 @@ import { formatPercentage } from "./number-format";
 import type { ProjectionRow } from "./api";
 import type { Account, Plan, SpendingRow } from "./schemas";
 
+function totalInitialBalance(plan: Plan): number {
+  if (plan.accounts.length) {
+    return plan.accounts.reduce((sum, account) => sum + (account.initialBalance ?? 0), 0);
+  }
+  return plan.initialBalance ?? 0;
+}
+
 function escapeHtml(value: string): string {
   return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
@@ -51,9 +58,9 @@ function makeProjectionTable(rows: ProjectionRow[]): string {
   const headers = [
     "Age",
     "Contribution",
-    "Spending (min)",
-    "Spending (avg)",
-    "Spending (max)",
+    "Withdraw (min)",
+    "Withdraw (avg)",
+    "Withdraw (max)",
     "Savings (min)",
     "Savings (avg)",
     "Savings (max)",
@@ -95,8 +102,8 @@ export function exportPlanToExcel(plan: Plan, rows: ProjectionRow[]): void {
     [
       ["Current Age", plan.startAge],
       ["Retirement Age", plan.retireAge],
-      ["Current Savings", formatCurrency(plan.initialBalance ?? 0)],
-      ["Desired Annual Retirement Spending", formatCurrency(plan.startingRetirementSpending ?? 0)],
+      ["Current Savings", formatCurrency(totalInitialBalance(plan))],
+      ["Desired Annual Retirement Withdrawals", formatCurrency(plan.startingRetirementSpending ?? 0)],
     ],
   );
 
@@ -117,15 +124,15 @@ export function exportPlanToExcel(plan: Plan, rows: ProjectionRow[]): void {
 
   const spendingRows =
     plan.spendingSchedule.length === 0
-      ? [["Schedule", "No retirement spending overrides"]]
+      ? [["Schedule", "No retirement withdrawal overrides"]]
       : plan.spendingSchedule
           .slice()
           .sort((a, b) => a.fromAge - b.fromAge)
           .map((row, index) => [
-            `Edit Retirement Spending (${index + 1})`,
+            `Edit Retirement Withdrawals (${index + 1})`,
             spendingRowLabel(row, plan.startAge, plan.inflationRate),
           ]);
-  const spendingTable = makeTable(["Edit Retirement Spending", "Details"], spendingRows);
+  const spendingTable = makeTable(["Edit Retirement Withdrawals", "Details"], spendingRows);
 
   const calculations = makeTable(
     ["Calculations", "min", "avg", "max"],
@@ -161,6 +168,7 @@ export function exportPlanToExcel(plan: Plan, rows: ProjectionRow[]): void {
   <body>
     <div>Detailed Compound Interest Calculator Export</div>
     <div>Snapshot of your current inputs, assumptions, and full projection timeline.</div>
+    <div><strong>Note:</strong> All amounts are displayed in nominal dollars (not inflation-adjusted).</div>
     ${basics}
     ${assumptions}
     ${savingsSummary}
