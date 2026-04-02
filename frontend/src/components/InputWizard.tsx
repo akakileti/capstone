@@ -9,8 +9,18 @@ interface InputWizardProps {
   onPlanChange: (updater: (plan: Plan) => Plan) => void;
 }
 
+type NumericField =
+  | "startAge"
+  | "retireAge"
+  | "initialBalance"
+  | "startingRetirementSpending"
+  | "inflationRate"
+  | "inflationMargin"
+  | "investmentGrowthRate"
+  | "investmentGrowthMargin";
+
 export function InputWizard({ plan, onPlanChange }: InputWizardProps) {
-  const fieldMin: Partial<Record<keyof Plan, number>> = {
+  const fieldMin: Record<NumericField, number> = {
     startAge: 0,
     retireAge: 0,
     initialBalance: 0,
@@ -21,13 +31,18 @@ export function InputWizard({ plan, onPlanChange }: InputWizardProps) {
     investmentGrowthMargin: 0,
   };
 
-  const marginToRate: Partial<Record<keyof Plan, keyof Plan>> = {
+  const marginToRate: Partial<Record<NumericField, NumericField>> = {
     inflationMargin: "inflationRate",
     investmentGrowthMargin: "investmentGrowthRate",
   };
 
+  const getNumeric = (p: Plan, key: NumericField): number => {
+    const value = p[key];
+    return typeof value === "number" ? value : 0;
+  };
+
   const handleNumberChange =
-    (field: keyof Plan) =>
+    (field: NumericField) =>
     (event: ChangeEvent<HTMLInputElement>) => {
       const value = Number(event.target.value);
       if (Number.isNaN(value)) {
@@ -39,7 +54,7 @@ export function InputWizard({ plan, onPlanChange }: InputWizardProps) {
       // Clamp margin so it cannot exceed its paired rate
       const pairedRate = marginToRate[field];
       if (pairedRate) {
-        const currentRate = Math.max(plan[pairedRate] as number, fieldMin[pairedRate] ?? 0);
+        const currentRate = Math.max(getNumeric(plan, pairedRate), fieldMin[pairedRate]);
         sanitized = Math.min(sanitized, currentRate);
       }
 
@@ -48,11 +63,11 @@ export function InputWizard({ plan, onPlanChange }: InputWizardProps) {
         const next: Plan = { ...current, [field]: sanitized };
 
         const pairedMargin = (Object.entries(marginToRate).find(([, rate]) => rate === field)?.[0] ??
-          null) as keyof Plan | null;
+          null) as NumericField | null;
         if (pairedMargin) {
-          const marginMin = fieldMin[pairedMargin] ?? 0;
-          const marginValue = next[pairedMargin] as number;
-          next[pairedMargin] = Math.min(Math.max(marginValue, marginMin), sanitized) as Plan[keyof Plan];
+          const marginMin = fieldMin[pairedMargin];
+          const marginValue = getNumeric(next, pairedMargin);
+          next[pairedMargin] = Math.min(Math.max(marginValue, marginMin), sanitized) as Plan[typeof pairedMargin];
         }
 
         return next;
