@@ -15,6 +15,15 @@ export function InputWizard({ plan, onPlanChange }: InputWizardProps) {
     retireAge: 0,
     initialBalance: 0,
     startingRetirementSpending: 0,
+    inflationRate: 0,
+    inflationMargin: 0,
+    investmentGrowthRate: 0,
+    investmentGrowthMargin: 0,
+  };
+
+  const marginToRate: Partial<Record<keyof Plan, keyof Plan>> = {
+    inflationMargin: "inflationRate",
+    investmentGrowthMargin: "investmentGrowthRate",
   };
 
   const handleNumberChange =
@@ -25,11 +34,29 @@ export function InputWizard({ plan, onPlanChange }: InputWizardProps) {
         return;
       }
       const minValue = fieldMin[field] ?? Number.NEGATIVE_INFINITY;
-      const sanitized = Math.max(value, minValue);
-      onPlanChange((current) => ({
-        ...current,
-        [field]: sanitized,
-      }));
+      let sanitized = Math.max(value, minValue);
+
+      // Clamp margin so it cannot exceed its paired rate
+      const pairedRate = marginToRate[field];
+      if (pairedRate) {
+        const currentRate = Math.max(plan[pairedRate] as number, fieldMin[pairedRate] ?? 0);
+        sanitized = Math.min(sanitized, currentRate);
+      }
+
+      // Update state and, if a rate changes, also clamp its margin
+      onPlanChange((current) => {
+        const next: Plan = { ...current, [field]: sanitized };
+
+        const pairedMargin = (Object.entries(marginToRate).find(([, rate]) => rate === field)?.[0] ??
+          null) as keyof Plan | null;
+        if (pairedMargin) {
+          const marginMin = fieldMin[pairedMargin] ?? 0;
+          const marginValue = next[pairedMargin] as number;
+          next[pairedMargin] = Math.min(Math.max(marginValue, marginMin), sanitized) as Plan[keyof Plan];
+        }
+
+        return next;
+      });
     };
 
   const startAge = plan.startAge;
@@ -113,6 +140,7 @@ export function InputWizard({ plan, onPlanChange }: InputWizardProps) {
               className={inputClassName}
               type="number"
               step="0.001"
+              min={0}
               value={plan.inflationRate}
               onChange={handleNumberChange("inflationRate")}
             />
@@ -122,6 +150,7 @@ export function InputWizard({ plan, onPlanChange }: InputWizardProps) {
               className={inputClassName}
               type="number"
               step="0.001"
+              min={0}
               value={plan.inflationMargin}
               onChange={handleNumberChange("inflationMargin")}
             />
@@ -139,6 +168,7 @@ export function InputWizard({ plan, onPlanChange }: InputWizardProps) {
               className={inputClassName}
               type="number"
               step="0.001"
+              min={0}
               value={plan.investmentGrowthRate}
               onChange={handleNumberChange("investmentGrowthRate")}
             />
@@ -148,6 +178,7 @@ export function InputWizard({ plan, onPlanChange }: InputWizardProps) {
               className={inputClassName}
               type="number"
               step="0.001"
+              min={0}
               value={plan.investmentGrowthMargin}
               onChange={handleNumberChange("investmentGrowthMargin")}
             />
