@@ -41,9 +41,21 @@ export function InputWizard({ plan, onPlanChange }: InputWizardProps) {
     return typeof value === "number" ? value : 0;
   };
 
+  const hasMultipleAccounts = plan.accounts.length > 1;
+  const hasDetailedSpending = plan.spendingSchedule.length > 1;
+
   const handleNumberChange =
     (field: NumericField) =>
     (event: ChangeEvent<HTMLInputElement>) => {
+      if (field === "initialBalance" && hasMultipleAccounts) {
+        // Once multiple accounts exist, initial balance must be edited per-account in detailed planning.
+        return;
+      }
+      if (field === "startingRetirementSpending" && hasDetailedSpending) {
+        // Once multiple retirement spending rows exist, edit them in Detailed Planning.
+        return;
+      }
+
       const value = Number(event.target.value);
       if (Number.isNaN(value)) {
         return;
@@ -61,6 +73,21 @@ export function InputWizard({ plan, onPlanChange }: InputWizardProps) {
       // Update state and, if a rate changes, also clamp its margin
       onPlanChange((current) => {
         const next: Plan = { ...current, [field]: sanitized };
+
+        if (field === "initialBalance" && !hasMultipleAccounts) {
+          // Keep the first account's starting balance in sync when only one account exists
+          const [firstAccount, ...rest] = current.accounts;
+          if (firstAccount) {
+            next.accounts = [{ ...firstAccount, initialBalance: sanitized }, ...rest];
+          }
+        }
+        if (field === "startingRetirementSpending" && !hasDetailedSpending) {
+          // Keep the first spending row in sync when only a single row exists
+          const [firstRow, ...restRows] = current.spendingSchedule;
+          if (firstRow) {
+            next.spendingSchedule = [{ ...firstRow, annualSpending: sanitized }, ...restRows];
+          }
+        }
 
         const pairedMargin = (Object.entries(marginToRate).find(([, rate]) => rate === field)?.[0] ??
           null) as NumericField | null;
@@ -127,9 +154,14 @@ export function InputWizard({ plan, onPlanChange }: InputWizardProps) {
             className={inputClassName}
             type="number"
             step="100"
-            value={plan.initialBalance}
+            value={hasMultipleAccounts ? "" : plan.initialBalance}
             onChange={handleNumberChange("initialBalance")}
+            placeholder={hasMultipleAccounts ? "Set per account in Detailed Planning" : undefined}
+            disabled={hasMultipleAccounts}
           />
+          {hasMultipleAccounts ? (
+            <p className="text-xs text-slate-500">With multiple accounts, edit starting balances in Detailed Planning.</p>
+          ) : null}
         </Field>
 
         <Field label="Desired Annual Retirement Spending (USD, today&apos;s dollars)">
@@ -137,9 +169,14 @@ export function InputWizard({ plan, onPlanChange }: InputWizardProps) {
             className={inputClassName}
             type="number"
             step="100"
-            value={plan.startingRetirementSpending}
+            value={hasDetailedSpending ? "" : plan.startingRetirementSpending}
             onChange={handleNumberChange("startingRetirementSpending")}
+            placeholder={hasDetailedSpending ? "Set in Detailed Planning withdrawals" : undefined}
+            disabled={hasDetailedSpending}
           />
+          {hasDetailedSpending ? (
+            <p className="text-xs text-slate-500">With multiple withdrawal rows, make changes in Detailed Planning.</p>
+          ) : null}
         </Field>
 
         <p className="rounded-2xl bg-slate-50 px-4 py-3 text-xs text-slate-600">

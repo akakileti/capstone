@@ -73,7 +73,7 @@ const defaultContribution: ContributionRow = {
 };
 
 const defaultAccount: Account = {
-  label: "401(k)",
+  label: "Account 1",
   note: "",
   initialBalance: 25_000,
   contributions: [defaultContribution],

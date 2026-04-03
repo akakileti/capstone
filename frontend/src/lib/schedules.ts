@@ -158,7 +158,7 @@ export function fallbackAccounts(plan: Plan): Account[] {
 
   return [
     {
-      label: "General",
+      label: "Account 1",
       taxTreatment: "none",
       taxRate: 0,
       note: "",
